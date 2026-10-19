@@ -1,6 +1,6 @@
 # Hosted migration dry-run plan — for owner review (v3)
 
-**Status:** Proposed 2026-10-19, revised the same day after validating the CLI requirements against the official documentation. Nothing in this plan changes the hosted database. The dry-run prints what _would_ be applied; the actual push is a separate, later approval.
+**Status:** 2026-10-19, v3. Step 1 (`link`) was run with the owner's approval and succeeded; step 2 (`list-remote`) stopped with `DbConfigIpv6Error` on this IPv4-only network; step 3 was not run. See `docs/DAILY_LOG.md` for the verbatim outputs and the analysis. Nothing in this plan changes the hosted database.
 
 ## 1. Target and verified starting state
 
@@ -44,14 +44,15 @@ Consequences for the token:
 
 ## 4. Prerequisite status
 
-| Variable in `.env.local`        | Purpose                                                             | Status                                                                                                                                        |
-| ------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`      | Project URL                                                         | **Set** (by me)                                                                                                                               |
-| `SUPABASE_PROJECT_REF`          | Guard for the wrapper                                               | **Set** (by me, 2026-10-19)                                                                                                                   |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publishable key for the app                                         | **Set** (by me, fetched with the read-only MCP tool `get_publishable_keys` and piped into the file; the value never appeared in chat or logs) |
-| `SUPABASE_ACCESS_TOKEN`         | Scoped token for `link`                                             | **Pending — owner** (secret)                                                                                                                  |
-| `SUPABASE_DB_PASSWORD`          | Direct database connection for `link`, `list`, `dry-run`            | **Pending — owner** (secret)                                                                                                                  |
-| `SUPABASE_SERVICE_ROLE_KEY`     | Not needed for the dry-run; needed later for `pnpm bootstrap:admin` | Pending — owner, later                                                                                                                        |
+| Variable in `.env.local`        | Purpose                                                                                       | Status                                                                                                                                                           |
+| ------------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | Project URL                                                                                   | **Set** (by me)                                                                                                                                                  |
+| `SUPABASE_PROJECT_REF`          | Guard for the wrapper                                                                         | **Set** (by me, 2026-10-19)                                                                                                                                      |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publishable key for the app                                                                   | **Set** (by me, fetched with the read-only MCP tool `get_publishable_keys` and piped into the file; the value never appeared in chat or logs)                    |
+| `SUPABASE_ACCESS_TOKEN`         | Scoped token for `link`                                                                       | **Set** by owner 2026-10-19 with the three documented permissions; **needs Connection Pooling (Read) added** (new token) unless the pooler-host fallback is used |
+| `SUPABASE_DB_PASSWORD`          | Database connection for `link`, `list`, `dry-run`                                             | **Set** by owner 2026-10-19                                                                                                                                      |
+| `SUPABASE_POOLER_HOST`          | Optional fallback: Supavisor host (`aws-0-<region>.pooler.supabase.com`, dashboard → Connect) | Pending — only if the owner prefers not to create a new token                                                                                                    |
+| `SUPABASE_SERVICE_ROLE_KEY`     | Not needed for the dry-run; needed later for `pnpm bootstrap:admin`                           | Pending — owner, later                                                                                                                                           |
 
 ## 5. Secure entry of the two secrets (no value in chat, terminal output, logs or git)
 
