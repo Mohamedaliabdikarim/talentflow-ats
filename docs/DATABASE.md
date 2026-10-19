@@ -68,13 +68,15 @@ Legend: ✔ allowed through RLS, ✖ denied, S = server-side only through `servi
 | candidate_ai_insights    | ✖    | all within org                        | all within any org                          |
 | audit_events             | ✖    | insert via `log_audit_event` only     | select; insert via function or S            |
 
-`anon` has no privileges on any table in `public`. `authenticated` has table grants but every table has RLS enabled, so policies decide. `service_role` bypasses RLS and must only be used from server code behind an explicit `requirePlatformAdmin()` check.
+`anon` has no privileges on any table in `public`. `authenticated` has table grants but every table has RLS enabled, so policies decide. On the hosted project Supabase's default privileges also leave `authenticated` with `TRUNCATE`, `REFERENCES` and `TRIGGER` (not governed by RLS); proposed migration 0004 removes them (`docs/SECURITY.md` §8). `service_role` bypasses RLS and must only be used from server code behind an explicit `requirePlatformAdmin()` check.
 
 ## 6. Migration workflow
 
 - Migrations live in `supabase/migrations/<timestamp>_<name>.sql` and are the only way the schema changes.
 - Local verification: `pnpm db:verify` starts an embedded PostgreSQL 17 instance, applies `scripts/db/local-auth-shim.sql` (emulates `auth.users`, `auth.uid()` and the Supabase roles) and then all migrations, and runs the RLS test suite in `tests/db`.
-- Hosted: `pnpm supabase link --project-ref <ref>` then `pnpm supabase db push` (requires project credentials and owner approval).
+- Hosted: `pnpm supabase:hosted link|list-remote|dry-run|push` (credentials from `.env.local`; `push` only with owner approval). Migrations 0001–0003 were applied to the hosted project on 2026-10-19.
+- Parity check: `pnpm db:fingerprint` prints a hash of the local schema; the same query (`scripts/db/schema-fingerprint.sql`) run read-only on the hosted project must return the same hash (ADR-026).
+- Proposals: a migration that is written but not yet approved waits in `supabase/proposed/` with its own DB test; it moves to `supabase/migrations/` unchanged once approved. Pending: `20261019140000_privilege_hardening.sql` (`docs/SECURITY.md` §8).
 - Rollback strategy: forward-only migrations; a compensating migration is written for any change applied to the hosted project after customer data exists.
 
 ## 7. Known limitations / open points

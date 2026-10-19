@@ -16,6 +16,10 @@ begin
   if not exists (select 1 from pg_roles where rolname = 'service_role') then
     create role service_role nologin bypassrls;
   end if;
+  -- GoTrue writes auth.users as this role on Supabase; emulated for privilege tests.
+  if not exists (select 1 from pg_roles where rolname = 'supabase_auth_admin') then
+    create role supabase_auth_admin nologin;
+  end if;
 end
 $$;
 
@@ -47,3 +51,5 @@ $$;
 grant usage on schema auth to anon, authenticated, service_role;
 grant execute on function auth.uid() to anon, authenticated, service_role;
 grant execute on function auth.role() to anon, authenticated, service_role;
+grant usage on schema auth to supabase_auth_admin;
+grant all on table auth.users to supabase_auth_admin;

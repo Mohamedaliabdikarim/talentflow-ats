@@ -13,7 +13,7 @@ Multi-tenant applicant tracking system. Next.js 16 (App Router, React 19, strict
 3. **Secrets never enter the repository or the chat.** `.env*` is git-ignored except `.env.example` (names only). The service-role key is used only in `src/lib/supabase/admin.ts` (`server-only`) and `scripts/bootstrap-admin.ts`. Never print key values.
 4. **Authorization is server + database.** Every Server Action validates input with Zod and calls `requireUser` / `requireOrgAccess` / `requirePlatformAdmin` from `src/server/auth.ts` before anything else; provisioning actions touch the service role only after `requirePlatformAdmin`. RLS is the final authority; never rely on UI state.
 5. **Tenant-owned rows always carry `organization_id`.** New tables get the `can_access_org` policy pair, the `prevent_organization_change` trigger, composite FKs where they reference other tenant rows, and `revoke all … from anon`.
-6. **Schema changes only through new files in `supabase/migrations/`** (never edit applied migrations). Run `pnpm db:verify` and `pnpm db:types` after any migration change.
+6. **Schema changes only through new files in `supabase/migrations/`** (never edit applied migrations). Run `pnpm db:verify` and `pnpm db:types` after any migration change. A migration that still needs the owner's approval waits in `supabase/proposed/` with its own DB test (ADR-026).
 7. **Hosted operations need explicit owner approval each time**: `pnpm supabase:hosted push`, `pnpm bootstrap:admin`, creating hosted users, switching the MCP server off read-only, deploying, paid resources. Prepare, dry-run, report, then stop.
 8. **Invitation links are secrets**: shown once in the UI or the operator's terminal, never logged or stored; use `redactInviteUrl()` for any log line that could contain one. Audit metadata carries ids only, never emails or names.
 9. **Motion is sparse**: only the four sanctioned uses in `docs/DESIGN.md` §5; always inside `MotionConfig reducedMotion="user"`.
@@ -22,18 +22,19 @@ Multi-tenant applicant tracking system. Next.js 16 (App Router, React 19, strict
 
 ## Commands
 
-| Command                                                   | Purpose                                                                                |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `pnpm dev`                                                | Local dev server (needs Supabase keys in `.env.local`)                                 |
-| `pnpm lint` / `pnpm typecheck`                            | ESLint / `tsc --noEmit`                                                                |
-| `pnpm test`                                               | Vitest unit tests (Node environment; component tests opt into jsdom per file)          |
-| `pnpm db:verify`                                          | Embedded PostgreSQL: apply shim + migrations, run `tests/db`                           |
-| `pnpm db:types`                                           | Regenerate `src/lib/supabase/database.types.ts` from the migrations                    |
-| `pnpm build` / `pnpm start`                               | Standalone production build / run it                                                   |
-| `pnpm test:e2e`                                           | Playwright against the standalone build (`pnpm exec playwright install chromium` once) |
-| `pnpm check`                                              | lint + typecheck + test + db:verify + build                                            |
-| `pnpm supabase:hosted <link\|list-remote\|dry-run\|push>` | Hosted migrations via the CLI; `push` only with approval                               |
-| `pnpm bootstrap:admin --email … --project-ref …`          | First platform admin on the hosted project; only with approval                         |
+| Command                                                   | Purpose                                                                                   |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `pnpm dev`                                                | Local dev server (needs Supabase keys in `.env.local`)                                    |
+| `pnpm lint` / `pnpm typecheck`                            | ESLint / `tsc --noEmit`                                                                   |
+| `pnpm test`                                               | Vitest unit tests (Node environment; component tests opt into jsdom per file)             |
+| `pnpm db:verify`                                          | Embedded PostgreSQL: apply shim + migrations, run `tests/db`                              |
+| `pnpm db:types`                                           | Regenerate `src/lib/supabase/database.types.ts` from the migrations                       |
+| `pnpm db:fingerprint`                                     | Hash of the local schema; compare with the same query run read-only on the hosted project |
+| `pnpm build` / `pnpm start`                               | Standalone production build / run it                                                      |
+| `pnpm test:e2e`                                           | Playwright against the standalone build (`pnpm exec playwright install chromium` once)    |
+| `pnpm check`                                              | lint + typecheck + test + db:verify + build                                               |
+| `pnpm supabase:hosted <link\|list-remote\|dry-run\|push>` | Hosted migrations via the CLI; `push` only with approval                                  |
+| `pnpm bootstrap:admin --email … --project-ref …`          | First platform admin on the hosted project; only with approval                            |
 
 ## Code conventions
 

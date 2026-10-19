@@ -1,6 +1,6 @@
-# Hosted migration dry-run plan — for owner review (v4)
+# Hosted migration dry-run plan — for owner review (v5, executed)
 
-**Status:** 2026-10-19, v4. All three preparatory steps are done and verified: `link` (exit 0), `list-remote` via the pooler (three local versions, remote empty), `dry-run` via the pooler (exactly the three migrations would be applied; seeds and roles empty). A read-only MCP post-check shows the hosted schema still empty. **The push itself has not been run and needs a separate approval.** Verbatim outputs: `docs/DAILY_LOG.md`.
+**Status:** 2026-10-19, v5. Steps 1–3 (`link`, `list-remote`, `dry-run`) were done and verified; the owner then approved the push, which **ran once (exit 0) and applied the three migrations**. Read-only verification afterwards found no unexpected result: history consistent, 9 tables with RLS, hosted schema fingerprint identical to local, advisors 0 ERROR. Details in §9; verbatim outputs in `docs/DAILY_LOG.md`. Sections 1–8 are kept as the record of the plan that was executed.
 
 ## 1. Target and verified starting state
 
@@ -20,7 +20,7 @@ Guard in `scripts/db/hosted.mjs`: every subcommand refuses to run unless `NEXT_P
 | Order | File                                                           | Objects                                                                                              |
 | ----- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | 1     | `supabase/migrations/20261019120000_initial_schema.sql`        | 6 enums, 9 tables, 9 indexes, 3 trigger helpers, 13 triggers, `auth.users` → `profiles` sync trigger |
-| 2     | `supabase/migrations/20261019120100_rls_policies.sql`          | 5 helper functions, grants/revokes, RLS on 9 tables, 21 policies                                     |
+| 2     | `supabase/migrations/20261019120100_rls_policies.sql`          | 5 helper functions, grants/revokes, RLS on 9 tables, 16 policies                                     |
 | 3     | `supabase/migrations/20261019130000_membership_activation.sql` | `activate_my_memberships()`                                                                          |
 
 All three apply cleanly on PostgreSQL 17 locally and in CI (`pnpm db:verify`, 31 tests). Review notes: `docs/SUPABASE_INTEGRATION.md` §5.
@@ -98,3 +98,17 @@ Reply with the items you approve once `pnpm env:check` reports "all present":
 - [ ] Approve step 3 (`dry-run`).
 
 The push itself will be requested separately with the dry-run output attached.
+
+## 9. Push execution and verification (2026-10-19)
+
+| Step               | Command / call                                                                                       | Result                                                                                                                                                   |
+| ------------------ | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pre-flight         | ref guard, sha256 of the three files vs `HEAD`, MCP `list_migrations`/`list_tables`, fresh `dry-run` | ref and URL match; files unchanged since `02980df`; hosted empty; exactly the three reviewed files would apply                                           |
+| Push (once)        | `pnpm supabase:hosted push` (`supabase db push --db-url <pooler-url>`)                               | exit 0; `Applying migration …` × 3; `{"upToDate":false,"dryRun":false,"migrations":[…3],"seeds":[],"roles":[],"message":"Finished supabase db push."}`   |
+| History            | `pnpm supabase:hosted list-remote`; MCP `list_migrations`                                            | local = remote for all three versions                                                                                                                    |
+| Tables / RLS       | MCP `list_tables`                                                                                    | 9 tables, all `rls_enabled: true`                                                                                                                        |
+| Schema differences | `scripts/db/schema-fingerprint.sql` on hosted (MCP `execute_sql`) vs `pnpm db:fingerprint`           | identical fingerprint `227fed80180eced8183d19d5634a8ee0`                                                                                                 |
+| Advisors           | MCP `get_advisors` security + performance                                                            | 0 ERROR; WARNs on SECURITY DEFINER functions (documented, `docs/SECURITY.md` §8); INFO on unindexed FKs / unused indexes                                 |
+| Privileges         | MCP `execute_sql` (`has_table_privilege`, `has_function_privilege`)                                  | `anon` none; `authenticated` carries Supabase-default `TRUNCATE`/`REFERENCES`/`TRIGGER` → proposed migration 0004 (`supabase/proposed/`, needs approval) |
+
+Not done, each needing its own approval: `pnpm bootstrap:admin`, hosted Authentication settings, migration 0004, deployment, AI integration.

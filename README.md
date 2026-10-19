@@ -33,6 +33,7 @@ pnpm typecheck     # tsc --noEmit
 pnpm test          # unit tests (Vitest)
 pnpm db:verify     # embedded PostgreSQL 17: apply migrations, run the RLS suite
 pnpm db:types      # regenerate src/lib/supabase/database.types.ts from the migrations
+pnpm db:fingerprint # hash of the local schema, compared with the hosted project read-only
 pnpm build         # production build (standalone) + asset copy
 pnpm start         # node .next/standalone/server.js
 pnpm test:e2e      # Playwright smoke suite against the standalone build (pnpm exec playwright install chromium once)

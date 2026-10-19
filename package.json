@@ -19,7 +19,8 @@
     "bootstrap:admin": "node --env-file=.env.local --import tsx scripts/bootstrap-admin.ts",
     "supabase:hosted": "node --env-file=.env.local scripts/db/hosted.mjs",
     "env:set": "node scripts/env/set-local.mjs",
-    "env:check": "node scripts/env/check-local.mjs"
+    "env:check": "node scripts/env/check-local.mjs",
+    "db:fingerprint": "tsx scripts/db/schema-fingerprint.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

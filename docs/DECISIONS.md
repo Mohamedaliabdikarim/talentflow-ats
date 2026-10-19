@@ -328,3 +328,16 @@ Chronological architecture decision records. Statuses: Proposed | Approved | Imp
 - Implementation reference: `src/app/page.tsx`, `src/app/app/page.tsx`, `src/app/opengraph-image.tsx`, `src/components/landing/*`, `.landing` block in `src/app/globals.css`.
 - Verification evidence: `tests/e2e/landing.spec.ts` (hero, CTAs, nav, inert showcase, `/app` redirect, axe), screenshots at 375/768/1440 px (`docs/screenshots/landing-*.png`); see `docs/DAILY_LOG.md`.
 - Status: Implemented (local); owner's visual review pending
+
+### ADR-026 — Proposed migrations wait in `supabase/proposed/`; hosted/local parity by schema fingerprint
+
+- Date: 2026-10-19
+- Context / problem: After the first hosted push, verification found differences caused by Supabase's default privileges (extra `TRUNCATE`/`REFERENCES`/`TRIGGER` for `authenticated`, trigger functions executable over RPC). A fix is a schema change, and every hosted write needs separate owner approval. Also needed: a repeatable, read-only way to prove the hosted schema equals the migrations.
+- Options considered: (a) commit the fix straight into `supabase/migrations/` and wait for approval before pushing (risk: any later approved push would silently carry it); (b) keep the draft outside the migrations directory until approved; (c) apply by hand in the dashboard (no history, no test).
+- Chosen approach: (b). Drafts live in `supabase/proposed/`, which the CLI, `pnpm db:verify`, `pnpm db:types` and CI ignore; each draft has a DB test that applies it explicitly after emulating the hosted starting state. On approval the file moves to `supabase/migrations/` unchanged and follows the normal dry-run → push path. Parity check: `scripts/db/schema-fingerprint.sql` hashes every column, RLS flag, policy, constraint, index, function signature, enum and trigger in `public` (plus the `auth.users` triggers we own); `pnpm db:fingerprint` runs it locally and the same text runs on the hosted project through the read-only MCP; equal hashes mean no drift.
+- Why this approach: A proposal cannot be applied by accident, is tested before anyone decides, and the decision record (this file, `docs/SECURITY.md` §8) explains why it exists. The fingerprint turns "no schema differences" from a claim into a reproducible number.
+- Trade-offs / risks: Two directories to know about; the fingerprint excludes Supabase-created objects (`rls_auto_enable`) by name and does not hash grants, which are checked by separate privilege queries. Supabase's default privileges are emulated in the test, not reproduced from the platform's own scripts.
+- Security and privacy implications: Read-only verification only; no secrets; the proposal reduces privileges and never widens them.
+- Implementation reference: `supabase/proposed/20261019140000_privilege_hardening.sql`, `tests/db/privilege-hardening.test.ts`, `scripts/db/schema-fingerprint.sql`, `scripts/db/schema-fingerprint.ts`, `scripts/db/local-auth-shim.sql` (`supabase_auth_admin` role).
+- Verification evidence: `pnpm db:verify` 36 passed; hosted and local fingerprints `227fed80180eced8183d19d5634a8ee0` (`docs/DAILY_LOG.md`, 2026-10-19).
+- Status: Implemented (tooling and proposal); migration 0004 awaiting owner approval

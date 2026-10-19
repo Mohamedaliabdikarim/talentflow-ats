@@ -393,3 +393,58 @@ Reading: exactly the three committed migrations, in timestamp order; `seeds: []`
 **Verified vs pending:** landing implemented and tested locally; dashboard refresh is a documented proposal (`docs/DESIGN.md` §8.2) awaiting the owner's direction; hosted push, bootstrap admin, deployment not approved and not run.
 
 **Follow-up (same day):** the first full-page captures showed every section below the fold as blank: Motion server-renders the scroll-reveal `initial` state, so sections stay invisible until they scroll into view, and a visitor without JavaScript would never see them. Fixed with `data-reveal` wrappers plus a `<noscript>` rule that forces them visible, and the capture now scrolls the page before the shot. CI had also failed the landing axe check on the mobile profile because axe sampled colours mid-animation (a half-faded button reported as 3.66:1); the test now scrolls the page and waits until every reveal has reached full opacity before analysing. Re-run: `pnpm test:e2e` 45 passed, screenshots 27 passed, commit `fc7024f`; GitHub Actions run 39318041337: success.
+
+## 2026-10-19 (continued) — Hosted push executed once (approved) and read-only verification
+
+**Request:** landing design approved as is. The owner explicitly approved running `pnpm supabase:hosted push` once against the verified project, after confirming the ref and that the pending migrations are exactly the three reviewed files; then read-only verification of migration history, tables, RLS policies, advisors and schema differences; stop on anything unexpected. Not approved (not done): admin users, hosted authentication settings, deployment, AI integration.
+
+**Pre-flight (all verified before the push):**
+
+- Project ref `zcxmyaxpftzwpzvmhslm`; `NEXT_PUBLIC_SUPABASE_URL` matches; the wrapper's ref guard passed; `supabase/.temp/project-ref` matches; linked project name `talentflow-ats`.
+- The three files in `supabase/migrations/` are byte-identical to `HEAD` (sha256 `a4ac237d…`, `8a789f19…`, `a6f611cd…`; last changed in commit `02980df`).
+- Hosted state before the push: MCP `list_migrations` → `[]`, `list_tables` (public) → `[]`.
+- Fresh `pnpm supabase:hosted dry-run` (pooler route) listed exactly `20261019120000_initial_schema.sql`, `20261019120100_rls_policies.sql`, `20261019130000_membership_activation.sql`; seeds and roles empty.
+
+**Push (run once), verbatim output (connection string masked by the wrapper):**
+
+```text
+> node --env-file=.env.local scripts/db/hosted.mjs "push"
+[hosted] project zcxmyaxpftzwpzvmhslm: supabase db push --db-url <pooler-url>
+Connecting to remote database...
+Applying migration 20261019120000_initial_schema.sql...
+Applying migration 20261019120100_rls_policies.sql...
+Applying migration 20261019130000_membership_activation.sql...
+{"upToDate":false,"dryRun":false,"migrations":["20261019120000_initial_schema.sql","20261019120100_rls_policies.sql","20261019130000_membership_activation.sql"],"seeds":[],"roles":[],"message":"Finished supabase db push."}
+exit=0
+```
+
+Nothing unexpected occurred; the stop rule was not triggered.
+
+**Read-only verification after the push:**
+
+| Check                         | Tool                                                                                                                   | Result                                                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Migration history             | `pnpm supabase:hosted list-remote`                                                                                     | exit 0; `{"migrations":[{"local":"20261019120000","remote":"20261019120000",…},{"local":"20261019120100","remote":"20261019120100",…},{"local":"20261019130000","remote":"20261019130000",…}],"message":"Migrations listed"}` — local and remote identical                                                                                                                  |
+| Migration history             | MCP `list_migrations`                                                                                                  | three versions: `initial_schema`, `rls_policies`, `membership_activation`                                                                                                                                                                                                                                                                                                   |
+| Tables                        | MCP `list_tables` (public)                                                                                             | 9 tables (`organizations`, `profiles`, `platform_admins`, `organization_memberships`, `jobs`, `candidates`, `applications`, `candidate_ai_insights`, `audit_events`), every one `rls_enabled: true`, all empty                                                                                                                                                              |
+| Schema differences            | `scripts/db/schema-fingerprint.sql` on hosted (MCP `execute_sql`) vs `pnpm db:fingerprint` (local embedded PostgreSQL) | **identical**: fingerprint `227fed80180eced8183d19d5634a8ee0` on both; objects 215, columns 82, policies 16, functions 10 (Supabase's own `rls_auto_enable` excluded), triggers 13, auth triggers 2, RLS-enabled tables 9 (hosted re-run after the counter fix below also reports 9)                                                                                        |
+| Security advisor              | MCP `get_advisors` (security)                                                                                          | 0 ERROR. WARN `anon_security_definer_function_executable` for `sync_profile_from_auth_user`, `rls_auto_enable`; WARN `authenticated_security_definer_function_executable` for the same two plus `is_platform_admin`, `is_org_member`, `can_access_org`, `shares_organization_with`, `log_audit_event`, `activate_my_memberships` (the last six are intentional RPC helpers) |
+| Performance advisor           | MCP `get_advisors` (performance)                                                                                       | INFO only: 14 unindexed foreign keys, 9 unused indexes (database is empty; no action now)                                                                                                                                                                                                                                                                                   |
+| Table privileges per API role | MCP `execute_sql` (`has_table_privilege`)                                                                              | `anon`: none on any table (as designed). `authenticated`: the designed DML **plus** `REFERENCES`, `TRIGGER`, `TRUNCATE` on every table (Supabase default privileges, not present locally). `service_role`: all                                                                                                                                                              |
+| Function EXECUTE per API role | MCP `execute_sql` (`has_function_privilege`)                                                                           | helper functions: `anon` false, `authenticated` true (as designed); trigger functions `sync_profile_from_auth_user`, `set_updated_at`, `prevent_organization_change`, `touch_stage_changed_at` and Supabase's `rls_auto_enable`: executable by both roles                                                                                                                   |
+
+**Assessment:** migrations applied in order, history consistent, RLS enabled everywhere, schema identical to the local reference. Two differences from the local model were found, both caused by Supabase's default privileges rather than by the migrations: `authenticated` holds `TRUNCATE`/`REFERENCES`/`TRIGGER` (RLS does not govern `TRUNCATE`; PostgREST does not expose it, so the practical exposure is low, but it should not exist), and the profile-sync trigger function is executable over RPC (trigger functions cannot run outside a trigger, so the advisor warning is cosmetic). `rls_auto_enable()` belongs to the platform and is not ours to change.
+
+**Proposed (not applied) — migration 0004, privilege hardening:** `supabase/proposed/20261019140000_privilege_hardening.sql` revokes `TRUNCATE`, `REFERENCES`, `TRIGGER` from `authenticated` on all public tables and from the schema's default privileges, removes `anon` from the table defaults, limits `sync_profile_from_auth_user()` to `supabase_auth_admin`, and attempts to revoke `rls_auto_enable()` without failing if the platform owns it. The `supabase/proposed/` directory is outside `supabase/migrations/`, so no push can pick it up (ADR-026). Verified locally by `tests/db/privilege-hardening.test.ts`, which first emulates Supabase's default privileges, reproduces the hosted finding exactly, applies the proposal, and checks the result (including that the `auth.users` → `profiles` trigger still fires as `supabase_auth_admin`, a role added to `scripts/db/local-auth-shim.sql`). Moving the file into `supabase/migrations/` and pushing it needs the owner's approval.
+
+**Other changes:** `scripts/db/schema-fingerprint.sql` + `scripts/db/schema-fingerprint.ts` (`pnpm db:fingerprint`) committed; the `rls_enabled_tables` counter matched `t` instead of `true` and reported 0 (cosmetic; hashes were unaffected) — fixed, and the hosted re-run reports 9. Policy count corrected from 21 to 16 in two documents.
+
+**Tests run and exact results:**
+
+| Command                        | Result                                                    |
+| ------------------------------ | --------------------------------------------------------- |
+| `pnpm lint` / `pnpm typecheck` | Pass                                                      |
+| `pnpm db:verify`               | 36 passed / 36 in 4 files (31 existing + 5 new hardening) |
+| `pnpm db:fingerprint`          | `227fed80180eced8183d19d5634a8ee0`, RLS-enabled tables 9  |
+
+**Not done (separate approvals):** `pnpm bootstrap:admin` (first hosted user; note that the `auth.users` → `profiles` trigger has not yet fired on the hosted project, so the bootstrap is also its first real exercise), hosted Authentication settings (sign-ups off, OTP expiry, redirect URLs, password length), migration 0004, deployment, AI integration.

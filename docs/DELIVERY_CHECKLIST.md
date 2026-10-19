@@ -14,12 +14,12 @@ Final delivery package (spec §14). Updated at each phase gate. Nothing is ticke
 
 ## Phase gates
 
-| Phase | Date          | Gate                                                               | Status                                                                                        |
-| ----- | ------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| 0     | 2026-10-19    | Scaffold, docs, schema + RLS, baseline lint/type-check/tests/build | Complete (see `docs/DAILY_LOG.md`)                                                            |
-| 1     | 2026-10-20    | Auth, roles, provisioning, hosted migrations, access tests         | Implemented locally; hosted apply, bootstrap admin and auth E2E await approval                |
-| 2     | 2026-10-21    | Organizations, jobs, candidates, applications CRUD                 | Implemented locally 2026-10-19 (ahead of plan); browser verification needs the hosted project |
-| 3     | 2026-10-22    | Kanban, filters, responsive UI, Motion, E2E                        | Pending                                                                                       |
-| 4     | 2026-10-23    | Negative security tests, fixes, deployment preparation             | Pending                                                                                       |
-| 5     | 2026-10-24/25 | Live deployment, smoke tests, optional AI, rehearsal               | Pending                                                                                       |
-| 6     | 2026-10-26    | Final verification, video, credentials, delivery notes             | Pending                                                                                       |
+| Phase | Date          | Gate                                                               | Status                                                                                                              |
+| ----- | ------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| 0     | 2026-10-19    | Scaffold, docs, schema + RLS, baseline lint/type-check/tests/build | Complete (see `docs/DAILY_LOG.md`)                                                                                  |
+| 1     | 2026-10-20    | Auth, roles, provisioning, hosted migrations, access tests         | Implemented locally; hosted migrations applied and verified 2026-10-19; bootstrap admin and auth E2E await approval |
+| 2     | 2026-10-21    | Organizations, jobs, candidates, applications CRUD                 | Implemented locally 2026-10-19 (ahead of plan); browser verification needs the hosted project                       |
+| 3     | 2026-10-22    | Kanban, filters, responsive UI, Motion, E2E                        | Pending                                                                                                             |
+| 4     | 2026-10-23    | Negative security tests, fixes, deployment preparation             | Pending                                                                                                             |
+| 5     | 2026-10-24/25 | Live deployment, smoke tests, optional AI, rehearsal               | Pending                                                                                                             |
+| 6     | 2026-10-26    | Final verification, video, credentials, delivery notes             | Pending                                                                                                             |
