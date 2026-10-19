@@ -44,3 +44,4 @@ next-env.d.ts
 /.pgdata
 /playwright-report
 /test-results
+!.env.example
