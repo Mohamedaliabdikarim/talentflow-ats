@@ -1,6 +1,6 @@
 # TalentFlow ATS — Supabase Integration
 
-**Status (2026-10-19, updated):** Hosted project identified; MCP server connected read-only and verified; local CLI config created (`supabase/config.toml`, `supabase init`); migrations verified locally only; dry-run plan in `docs/HOSTED_MIGRATION_DRY_RUN.md`. **Nothing has been applied to the hosted project.** Applying requires the owner's explicit approval of the plan in §6.
+**Status (2026-10-19, evening):** Hosted project identified and confirmed (`talentflow-ats`); MCP connected read-only and verified; CLI linked; `migration list` and `db push --dry-run` run through the Supavisor pooler with the owner's approval: the three migrations would apply, nothing applied. **Push pending separate approval.** Plan and outputs: `docs/HOSTED_MIGRATION_DRY_RUN.md`, `docs/DAILY_LOG.md`. **Nothing has been applied to the hosted project.** Applying requires the owner's explicit approval of the plan in §6.
 
 ## 1. Project identity
 

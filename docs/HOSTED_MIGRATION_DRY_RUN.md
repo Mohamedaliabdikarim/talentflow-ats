@@ -1,6 +1,6 @@
-# Hosted migration dry-run plan — for owner review (v3)
+# Hosted migration dry-run plan — for owner review (v4)
 
-**Status:** 2026-10-19, v3. Step 1 (`link`) was run with the owner's approval and succeeded; step 2 (`list-remote`) stopped with `DbConfigIpv6Error` on this IPv4-only network; step 3 was not run. See `docs/DAILY_LOG.md` for the verbatim outputs and the analysis. Nothing in this plan changes the hosted database.
+**Status:** 2026-10-19, v4. All three preparatory steps are done and verified: `link` (exit 0), `list-remote` via the pooler (three local versions, remote empty), `dry-run` via the pooler (exactly the three migrations would be applied; seeds and roles empty). A read-only MCP post-check shows the hosted schema still empty. **The push itself has not been run and needs a separate approval.** Verbatim outputs: `docs/DAILY_LOG.md`.
 
 ## 1. Target and verified starting state
 

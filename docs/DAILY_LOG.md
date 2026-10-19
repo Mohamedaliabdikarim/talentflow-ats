@@ -292,3 +292,42 @@ Per the approval, the sequence stopped here; **step 3 (`dry-run`) was not run.**
 **Verified vs pending:** link verified; project name verified; list-remote and dry-run pending the owner's choice above and a renewed go-ahead; push, bootstrap admin, deploy not approved.
 
 **Security/privacy review:** every CLI output passed through a redaction filter before entering the transcript; nothing matched. `.env.local` unchanged by the CLI; `supabase/.temp` ignored; the stored database password lives in the OS credential store (removable with `pnpm supabase:hosted unlink`).
+
+## 2026-10-19 (continued) — Approved hosted steps via the pooler: list-remote and dry-run VERIFIED
+
+**Owner decision:** option 2 (pooler host in `.env.local`, no new token). **Approval:** `list-remote` then `dry-run`, sequentially, stop on anything unexpected; no push, no users, no hosted modification.
+
+**Pre-checks (names only):** `pnpm env:check` → all present, `SUPABASE_POOLER_HOST` set (35 characters) and matching the pattern `aws-<region>.pooler.supabase.com`; ref `zcxmyaxpftzwpzvmhslm`, URL host `zcxmyaxpftzwpzvmhslm.supabase.co`, linked ref file identical. Repeated before each step.
+
+**Step 1 — `pnpm supabase:hosted list-remote` → VERIFIED, exit 0.** Output (redaction filter applied; the wrapper masks the connection URL as `<pooler-url>`):
+
+```
+[hosted] project zcxmyaxpftzwpzvmhslm: supabase migration list --db-url <pooler-url>
+Connecting to remote database...
+{"migrations":[{"local":"20261019120000","remote":"","time":"2026-10-19 12:00:00"},{"local":"20261019120100","remote":"","time":"2026-10-19 12:01:00"},{"local":"20261019130000","remote":"","time":"2026-10-19 13:00:00"}],"message":"Migrations listed"}
+```
+
+Reading: three local versions, remote column empty for all three, no discrepancy.
+
+**Step 2 — `pnpm supabase:hosted dry-run` → VERIFIED, exit 0.** Output verbatim (same masking):
+
+```
+[hosted] project zcxmyaxpftzwpzvmhslm: supabase db push --dry-run --db-url <pooler-url>
+DRY RUN: migrations will *not* be pushed to the database.
+Connecting to remote database...
+Would push these migrations:
+ • 20261019120000_initial_schema.sql
+ • 20261019120100_rls_policies.sql
+ • 20261019130000_membership_activation.sql
+{"upToDate":false,"dryRun":true,"migrations":["20261019120000_initial_schema.sql","20261019120100_rls_policies.sql","20261019130000_membership_activation.sql"],"seeds":[],"roles":[],"message":"Finished supabase db push."}
+```
+
+Reading: exactly the three committed migrations, in timestamp order; `seeds: []` and `roles: []` (nothing beyond the migrations would run); no warnings.
+
+**Post-check (read-only MCP, after the dry-run):** `list_tables` on `public` → `{"tables":[]}` and `list_migrations` → `{"migrations":[]}`: the dry-run changed nothing on the hosted project.
+
+**Readiness assessment:** the hosted database (PostgreSQL 17.11) is empty, the migration history is empty, the three files are the ones verified locally and in CI on PostgreSQL 17, and the pooler path works from this network. The database is ready for the migration push, which remains a separate approval (`pnpm supabase:hosted push`). After a push, the planned verification is: `list-remote` (three remote versions), MCP `list_tables` (9 tables), MCP `get_advisors` (security lint), and a diff of MCP `generate_typescript_types` against `src/lib/supabase/database.types.ts`.
+
+**Verified vs pending:** link, list-remote, dry-run verified; push, bootstrap admin, hosted dashboard auth settings (signups off, OTP expiry, redirect URLs), deployment pending separate approval.
+
+**Security/privacy review:** outputs passed through the redaction filter (nothing matched); the pooler URL with the password was passed to the CLI process only and masked in the wrapper's echo; `.env.local` untouched by the CLI; working tree clean after both steps.
