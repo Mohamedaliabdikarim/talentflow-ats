@@ -75,14 +75,14 @@ Unit count note: 73 before and 74 after the pending-invite refinement in `invite
 
 ### 2026-10-19 — Phase 2 local verification (same machine)
 
-| Command                        | Result                   | Notes                                          |
-| ------------------------------ | ------------------------ | ---------------------------------------------- |
-| `pnpm lint` / `pnpm typecheck` | Pass                     | React Compiler purity rule enforced            |
-| `pnpm test`                    | 89 passed / 89 (6 files) | adds pipeline helpers and workspace actions    |
-| `pnpm db:verify`               | 31 passed / 31 (3 files) | adds `tests/db/pipeline.test.ts`               |
-| `pnpm build`                   | Pass                     | jobs, candidates, pipeline routes, all dynamic |
-| `pnpm test:e2e`                | 10 passed / 10           | smoke suite unchanged                          |
-| GitHub Actions (Phase 2 push)  | See `docs/DAILY_LOG.md`  |                                                |
+| Command                                           | Result                   | Notes                                          |
+| ------------------------------------------------- | ------------------------ | ---------------------------------------------- |
+| `pnpm lint` / `pnpm typecheck`                    | Pass                     | React Compiler purity rule enforced            |
+| `pnpm test`                                       | 89 passed / 89 (6 files) | adds pipeline helpers and workspace actions    |
+| `pnpm db:verify`                                  | 31 passed / 31 (3 files) | adds `tests/db/pipeline.test.ts`               |
+| `pnpm build`                                      | Pass                     | jobs, candidates, pipeline routes, all dynamic |
+| `pnpm test:e2e`                                   | 10 passed / 10           | smoke suite unchanged                          |
+| GitHub Actions run 39296039441 (commit `af3e19b`) | Success, 1m35s           | Clean Ubuntu checkout: all steps green         |
 
 ### Not yet executed
 

@@ -148,15 +148,15 @@ Not run: Playwright E2E (needs browsers and, for authenticated flows, a hosted S
 
 **Tests run and exact results:**
 
-| Command                       | Result                                           |
-| ----------------------------- | ------------------------------------------------ |
-| `pnpm lint`                   | Pass (after moving the timestamp out of render)  |
-| `pnpm typecheck`              | Pass                                             |
-| `pnpm test`                   | 89 passed / 89 in 6 files                        |
-| `pnpm db:verify`              | 31 passed / 31 in 3 files (3 migrations applied) |
-| `pnpm build`                  | Pass; all workspace routes dynamic               |
-| `pnpm test:e2e`               | 10 passed / 10 (chromium + mobile), 19.5 s       |
-| GitHub Actions (Phase 2 push) | Recorded below                                   |
+| Command                                                          | Result                                                                                            |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `pnpm lint`                                                      | Pass (after moving the timestamp out of render)                                                   |
+| `pnpm typecheck`                                                 | Pass                                                                                              |
+| `pnpm test`                                                      | 89 passed / 89 in 6 files                                                                         |
+| `pnpm db:verify`                                                 | 31 passed / 31 in 3 files (3 migrations applied)                                                  |
+| `pnpm build`                                                     | Pass; all workspace routes dynamic                                                                |
+| `pnpm test:e2e`                                                  | 10 passed / 10 (chromium + mobile), 19.5 s                                                        |
+| GitHub Actions run 39296039441 (commit `af3e19b`, ubuntu-latest) | Success in 1m35s: lint, typecheck, unit (89), db:verify (31), build, bundle grep, Playwright (10) |
 
 **Security/privacy review:**
 
