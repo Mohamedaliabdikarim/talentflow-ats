@@ -24,13 +24,15 @@
 
 `src/lib/env.ts` validates these at startup. `.env.example` lists names without values.
 
+**Build-time inlining (verified 2026-10-19):** Next.js replaces `process.env.NEXT_PUBLIC_*` with the values present when `next build` runs, in server and client bundles alike. An empty value in `.env.local` is baked in as an empty string and cannot be overridden by App Service settings. Consequences: (1) keep unset `NEXT_PUBLIC_*` lines commented out locally; (2) the GitHub Actions build job must receive the production `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `NEXT_PUBLIC_APP_URL` as repository variables; (3) server-only secrets (`SUPABASE_SERVICE_ROLE_KEY`, AI keys) stay runtime-only in App Service application settings.
+
 ## 3. Supabase configuration checklist
 
 1. Create project (owner). Record project ref and region.
 2. Authentication → URL configuration: Site URL = `https://<app>.azurewebsites.net`; Redirect URLs include `https://<app>.azurewebsites.net/auth/callback` and `http://localhost:3000/auth/callback`.
 3. Authentication → Email: enable email provider; disable public sign-ups (users are invited); set minimum password length to 10.
 4. Apply migrations: `pnpm supabase link --project-ref <ref>` then `pnpm supabase db push`.
-5. Create the first platform admin: run `pnpm tsx scripts/bootstrap-admin.ts --email <demo-admin-email>` locally with the service-role key in `.env.local` (script planned in Phase 1). Credentials are shared privately.
+5. Create the first platform admin: `pnpm bootstrap:admin --email <demo-admin-email> --name "<name>" --project-ref <ref>` locally with the service-role key in `.env.local` (requires approval; see `docs/SUPABASE_INTEGRATION.md` §7). Credentials are shared privately.
 
 ## 4. Azure App Service steps (planned)
 

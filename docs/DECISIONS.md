@@ -87,7 +87,7 @@ Chronological architecture decision records. Statuses: Proposed | Approved | Imp
 - Options considered: (a) RLS insert policies for admins and client-side calls; (b) Server Actions using the service-role key after a database-backed admin check; (c) temporary passwords emailed to users.
 - Chosen approach: (b). The admin action generates an invite link with `auth.admin.generateLink({ type: 'invite' })` and displays it once for copy; if SMTP is configured, the same action can also send the email. The invited user sets a password on first visit.
 - Why this approach: Keeps elevated privileges server-side, works without SMTP, avoids sending passwords, and leaves an audit trail.
-- Trade-offs / risks: The admin must deliver the link out of band for the demo. Links expire (Supabase default 24 h); the action can regenerate.
+- Trade-offs / risks: The admin must deliver the link out of band for the demo. Links expire with the email OTP setting (default one hour); the action can regenerate.
 - Security and privacy implications: Service-role key is server-only and guarded by `server-only`; invite links are never logged.
 - Implementation reference: `src/lib/supabase/admin.ts`, `src/server/actions/admin.ts` (planned).
 - Verification evidence: pending.
@@ -183,3 +183,81 @@ Chronological architecture decision records. Statuses: Proposed | Approved | Imp
 - Implementation reference: `src/components/kanban/` (planned).
 - Verification evidence: pending (Phase 3 E2E).
 - Status: Approved
+
+### ADR-015 — Private GitHub repository with CI from the first push
+
+- Date: 2026-10-19
+- Context / problem: The owner approved publishing to a private repository named `talentflow-ats` after a secrets check, preserving history.
+- Options considered: push now; wait until Phase 1 is complete.
+- Chosen approach: `gh repo create talentflow-ats --private --source . --push` after `git log -p` was scanned for key patterns (none found; no `.env*` tracked). CI runs lint, type-check, unit, DB and E2E smoke on every push.
+- Why this approach: Early CI catches environment-only assumptions; the first run did exactly that (`LayoutProps` global missing on a clean checkout, fixed by an explicit prop type).
+- Trade-offs / risks: CI minutes; embedded PostgreSQL download per run.
+- Security and privacy implications: Repository is private; secrets stay in `.env.local`/Actions secrets (none needed yet).
+- Implementation reference: `.github/workflows/ci.yml`, https://github.com/Mohamedaliabdikarim/talentflow-ats
+- Verification evidence: `docs/DAILY_LOG.md` 2026-10-19 (CI run results).
+- Status: Implemented
+
+### ADR-016 — Project-scoped, read-only Supabase MCP server
+
+- Date: 2026-10-19
+- Context / problem: The owner wants the official Supabase MCP server available to the agent, scoped to the existing project, read-only at first, authenticated through OAuth without pasting tokens.
+- Options considered: user-scoped config; project-scoped `.mcp.json` (shared via git); scoped personal access token in a header.
+- Chosen approach: `claude mcp add --scope project --transport http supabase "<url with project_ref and read_only=true>"`; OAuth completed by the owner in an interactive session.
+- Why this approach: `.mcp.json` carries no secrets and documents the exact scope for everyone; OAuth avoids long-lived tokens on disk.
+- Trade-offs / risks: Tools are unavailable in non-interactive sessions until approved; read-only means migrations go through the CLI, which is the intended separation.
+- Security and privacy implications: Read-only; project-scoped; the agent cannot mutate the hosted project through MCP.
+- Implementation reference: `.mcp.json`, `docs/SUPABASE_INTEGRATION.md` §2.
+- Verification evidence: `claude mcp list` shows the server pending approval; connectivity test pending the owner's OAuth.
+- Status: Implemented (configuration) / Verification pending
+
+### ADR-017 — Official Supabase agent skills installed in the repository
+
+- Date: 2026-10-19
+- Context / problem: The owner asked to evaluate and install relevant official Supabase Agent Skills after inspecting installer changes.
+- Options considered: `npx skills add` (project copy), Claude Code plugin marketplace, none.
+- Chosen approach: Cloned `supabase/agent-skills`, read both `SKILL.md` files (instructions only, no executables), installed `supabase` and `supabase-postgres-best-practices` for Claude Code with `--yes`, reviewed `git status` (`.claude/skills/**`, `skills-lock.json`) and committed.
+- Why this approach: Both skills apply directly (SSR auth patterns, RLS security checklist, Postgres practices); a repository copy keeps the team on the same version.
+- Trade-offs / risks: ~45 Markdown files in the repo; updates are manual (`npx skills add … --yes` again).
+- Security and privacy implications: Skills are data for the agent; no code runs. They were reviewed before use.
+- Implementation reference: `.claude/skills/`, `skills-lock.json`, `docs/TOOLING_INVENTORY.md`.
+- Verification evidence: Security checklist from the skill cross-checked against the migrations (`docs/SUPABASE_INTEGRATION.md` §3).
+- Status: Implemented
+
+### ADR-018 — Invitation links via token hash and a confirm route, not PKCE action links
+
+- Date: 2026-10-19
+- Context / problem: Invitation links are generated server-side (ADR-007). Supabase's `action_link` relies on the PKCE verifier stored by the browser that started the flow, which does not exist for admin-generated links.
+- Options considered: use `action_link` with the implicit flow; use `hashed_token` + `/auth/confirm` calling `verifyOtp`; send emails through Supabase SMTP.
+- Chosen approach: Build `/auth/confirm?token_hash=…&type=invite|magiclink&next=…` from `properties.hashed_token`; the route handler calls `verifyOtp`, sets the session cookies and redirects to a validated relative path. New users land on `/auth/set-password`, which also calls `activate_my_memberships()`. Existing accounts get a magic link and an active membership immediately.
+- Why this approach: Works for server-generated links, keeps the whole flow on our domain, no SMTP dependency, tokens are single-use.
+- Trade-offs / risks: Link holder can claim the account until expiry; links must be shared privately; default lifetime is one hour (project setting).
+- Security and privacy implications: Tokens are never logged or persisted; audit rows carry user ids only; `redactInviteUrl()` guards future logging; generic error messages on invalid/expired links.
+- Implementation reference: `src/lib/invite.ts`, `src/app/auth/confirm/route.ts`, `src/server/actions/admin.ts`, `docs/SUPABASE_INTEGRATION.md` §8.
+- Verification evidence: Unit tests (`tests/unit/invite.test.ts`, `tests/unit/admin-actions.test.ts`), E2E smoke for the confirm route without a token; hosted end-to-end pending approval to create users.
+- Status: Implemented (local) / Hosted verification pending
+
+### ADR-019 — Self-service membership activation function (migration 0003)
+
+- Date: 2026-10-19
+- Context / problem: Invited memberships start as `invited` and members have no update policy on memberships, so the invited user cannot activate their own row through RLS.
+- Options considered: create memberships as `active` immediately; let the server action use the service role after `updateUser`; a `SECURITY DEFINER` function restricted to the caller's rows.
+- Chosen approach: `public.activate_my_memberships()` (definer, `search_path = ''`, `auth.uid()` guard, updates only `user_id = auth.uid() and status = 'invited'`, `EXECUTE` revoked from `PUBLIC`).
+- Why this approach: Keeps the service role out of the end-user flow and keeps the `invited` state meaningful for admins.
+- Trade-offs / risks: One more definer function to review; covered by DB tests.
+- Security and privacy implications: Cannot affect other users' rows; anonymous callers are rejected.
+- Implementation reference: `supabase/migrations/20261019130000_membership_activation.sql`, `tests/db/membership-activation.test.ts`.
+- Verification evidence: `pnpm db:verify` (see daily log).
+- Status: Implemented / Verified locally
+
+### ADR-020 — Typed Supabase client generated from the migrations
+
+- Date: 2026-10-19
+- Context / problem: Untyped queries hide column and relationship mistakes. `supabase gen types --db-url` exited without output on this machine (no Docker, CLI not logged in).
+- Options considered: hand-written types; CLI/MCP generation after the hosted apply; a small generator reading the catalog of the embedded database.
+- Chosen approach: `scripts/db/gen-types.ts` (`pnpm db:types`) emits `Database` in the supabase-js shape (Tables with Row/Insert/Update/Relationships, Functions, Enums) and all three client factories use `<Database>`.
+- Why this approach: Types always match the committed migrations and need no hosted access; later CLI output can be diffed against the file.
+- Trade-offs / risks: Custom generator covers the types this schema uses (scalars, arrays, enums, json); exotic types map to `unknown`.
+- Security and privacy implications: none.
+- Implementation reference: `scripts/db/gen-types.ts`, `src/lib/supabase/database.types.ts`.
+- Verification evidence: `pnpm typecheck` passes with typed queries across the data layer.
+- Status: Implemented

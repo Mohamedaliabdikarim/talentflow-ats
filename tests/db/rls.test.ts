@@ -227,9 +227,16 @@ describe("cross-tenant links are impossible at the database level", () => {
 describe("platform admin", () => {
   it("reads every organization and every job", async () => {
     await asUser(ids.adminUser, async (client) => {
-      const orgs = await client.query(`select slug from public.organizations order by slug`);
+      // Scoped to this file's seed rows: other test files share the database.
+      const orgs = await client.query(
+        `select slug from public.organizations where id = any($1::uuid[]) order by slug`,
+        [[ids.orgA, ids.orgB]],
+      );
       expect(orgs.rows.map((row) => row.slug)).toEqual(["org-a", "org-b"]);
-      const jobs = await client.query(`select title from public.jobs order by title`);
+      const jobs = await client.query(
+        `select title from public.jobs where id = any($1::uuid[]) order by title`,
+        [[ids.jobA, ids.jobB]],
+      );
       expect(jobs.rows.map((row) => row.title)).toEqual(["Job A", "Job B"]);
     });
   });

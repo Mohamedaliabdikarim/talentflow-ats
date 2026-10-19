@@ -1,6 +1,6 @@
 # CLAUDE.md — TalentFlow ATS implementation instructions
 
-Read `TALENTFLOW_MASTER_SPEC_V2.md` (in the parent folder of this repository or the copy in `docs/spec/`) and this file at the start of every significant phase.
+Read `docs/spec/TALENTFLOW_MASTER_SPEC_V2.md`, this file and the latest entry of `docs/DAILY_LOG.md` at the start of every significant phase. Load the `supabase` and `supabase-postgres-best-practices` skills (`.claude/skills/`) before touching auth, RLS, migrations or Supabase client code.
 
 ## Project in one paragraph
 
@@ -10,42 +10,46 @@ Multi-tenant applicant tracking system. Next.js 16 (App Router, React 19, strict
 
 1. **English everywhere**: code, comments, UI strings, docs, tests, commits.
 2. **Never claim unverified work.** Status words: Planned → In progress → Implemented → Verified. "Verified" requires a recorded command and result in `docs/TEST_PLAN.md` or `docs/DAILY_LOG.md`.
-3. **Secrets never enter the repository.** `.env*` is git-ignored; `.env.example` has names only. The service-role key is used only in `src/lib/supabase/admin.ts`, which imports `server-only`.
-4. **Authorization is server + database.** Every Server Action validates input with Zod and calls `requireUser` / `requireOrgAccess` / `requirePlatformAdmin` from `src/server/auth.ts`. RLS is the final authority; never rely on UI state.
-5. **Tenant-owned rows always carry `organization_id`.** New tables get the `can_access_org` policy pair, the `prevent_organization_change` trigger, and composite FKs where they reference other tenant rows.
-6. **Schema changes only through `supabase/migrations/`.** Run `pnpm db:verify` after any migration change.
-7. **No paid resources, deployments, credential use or public publication without the owner's explicit approval.** Stop and ask.
-8. **Motion is sparse**: only the four sanctioned uses in `docs/DESIGN.md` §5; always inside `MotionConfig reducedMotion="user"`.
-9. **Accessibility is a requirement**, not polish: labels, focus, keyboard paths (Kanban "Move to stage" menu), contrast, live regions.
-10. **Document why, not what.** Short JSDoc/TSDoc on non-obvious code; ADRs in `docs/DECISIONS.md`; dated entries in `docs/DAILY_LOG.md`.
+3. **Secrets never enter the repository or the chat.** `.env*` is git-ignored except `.env.example` (names only). The service-role key is used only in `src/lib/supabase/admin.ts` (`server-only`) and `scripts/bootstrap-admin.ts`. Never print key values.
+4. **Authorization is server + database.** Every Server Action validates input with Zod and calls `requireUser` / `requireOrgAccess` / `requirePlatformAdmin` from `src/server/auth.ts` before anything else; provisioning actions touch the service role only after `requirePlatformAdmin`. RLS is the final authority; never rely on UI state.
+5. **Tenant-owned rows always carry `organization_id`.** New tables get the `can_access_org` policy pair, the `prevent_organization_change` trigger, composite FKs where they reference other tenant rows, and `revoke all … from anon`.
+6. **Schema changes only through new files in `supabase/migrations/`** (never edit applied migrations). Run `pnpm db:verify` and `pnpm db:types` after any migration change.
+7. **Hosted operations need explicit owner approval each time**: `pnpm supabase:hosted push`, `pnpm bootstrap:admin`, creating hosted users, switching the MCP server off read-only, deploying, paid resources. Prepare, dry-run, report, then stop.
+8. **Invitation links are secrets**: shown once in the UI or the operator's terminal, never logged or stored; use `redactInviteUrl()` for any log line that could contain one. Audit metadata carries ids only, never emails or names.
+9. **Motion is sparse**: only the four sanctioned uses in `docs/DESIGN.md` §5; always inside `MotionConfig reducedMotion="user"`.
+10. **Accessibility is a requirement**: visible labels, `aria-describedby` errors, focusable error summary, keyboard paths (Kanban "Move to stage" menu), contrast, live regions, skip link.
+11. **Document why, not what.** Short JSDoc/TSDoc on non-obvious code; ADRs in `docs/DECISIONS.md`; dated entries in `docs/DAILY_LOG.md`.
 
 ## Commands
 
-| Command          | Purpose                                                     |
-| ---------------- | ----------------------------------------------------------- |
-| `pnpm dev`       | Local dev server (needs `.env.local` with Supabase values)  |
-| `pnpm lint`      | ESLint                                                      |
-| `pnpm typecheck` | `tsc --noEmit`                                              |
-| `pnpm test`      | Vitest unit tests                                           |
-| `pnpm db:verify` | Embedded PostgreSQL: apply shim + migrations, run RLS tests |
-| `pnpm test:e2e`  | Playwright (requires running app and hosted Supabase)       |
-| `pnpm build`     | Production build (standalone output)                        |
-| `pnpm check`     | lint + typecheck + test + build                             |
+| Command                                                   | Purpose                                                                                |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `pnpm dev`                                                | Local dev server (needs Supabase keys in `.env.local`)                                 |
+| `pnpm lint` / `pnpm typecheck`                            | ESLint / `tsc --noEmit`                                                                |
+| `pnpm test`                                               | Vitest unit tests (Node environment; component tests opt into jsdom per file)          |
+| `pnpm db:verify`                                          | Embedded PostgreSQL: apply shim + migrations, run `tests/db`                           |
+| `pnpm db:types`                                           | Regenerate `src/lib/supabase/database.types.ts` from the migrations                    |
+| `pnpm build` / `pnpm start`                               | Standalone production build / run it                                                   |
+| `pnpm test:e2e`                                           | Playwright against the standalone build (`pnpm exec playwright install chromium` once) |
+| `pnpm check`                                              | lint + typecheck + test + db:verify + build                                            |
+| `pnpm supabase:hosted <link\|list-remote\|dry-run\|push>` | Hosted migrations via the CLI; `push` only with approval                               |
+| `pnpm bootstrap:admin --email … --project-ref …`          | First platform admin on the hosted project; only with approval                         |
 
 ## Code conventions
 
-- Server Components by default; `"use client"` only for interactivity.
-- Data access in `src/server/data/*` (one module per aggregate), mutations in `src/server/actions/*`, shared Zod schemas in `src/lib/validation/*` (used by both client forms and actions).
-- Supabase clients: `createServerSupabase()` (cookies, RLS), `createBrowserSupabase()`, `createAdminSupabase()` (service role, server-only).
+- Server Components by default; `"use client"` only for interactivity (forms with `useActionState`, navigation state, clipboard).
+- Data access in `src/server/data/*`, mutations in `src/server/actions/*` wrapped in `runAction`, shared Zod schemas in `src/lib/validation/*` (used by both client forms and actions). Action results use `ActionState` from `src/lib/action-state.ts`.
+- Supabase clients: `createServerSupabase()` (cookies, RLS, typed), `createBrowserSupabase()`, `createAdminSupabase()` (service role, server-only).
+- Page props: type `params`/`searchParams` explicitly as Promises; do not rely on the generated `PageProps`/`LayoutProps` globals (absent on a clean checkout).
 - URL state for filters (`?job=<id>&q=<name>`) so views are shareable.
-- Errors: return `{ ok: false, error }` from actions for expected failures; throw only for bugs. Never leak other tenants' existence.
-- Tests: `tests/unit` (pure logic, schemas), `tests/db` (RLS, needs embedded Postgres), `tests/e2e` (Playwright). Name tests by behaviour, in English.
-- Commits: imperative, scoped (`feat(kanban): …`, `fix(rls): …`, `docs: …`). End with the attribution line required by the session.
+- Errors: return `{ status: "error", message, fieldErrors }` from actions for expected failures; throw only for bugs. Never leak other tenants' existence (same copy for hidden and missing).
+- Tests: `tests/unit` (pure logic, guards and actions with mocked clients), `tests/db` (RLS, embedded Postgres, scope assertions to the file's own seed ids), `tests/e2e` (Playwright). Name tests by behaviour, in English.
+- Commits: imperative, scoped (`feat(auth): …`, `fix(rls): …`, `docs: …`). End with the attribution line required by the session.
 
 ## Phase gate checklist (run before reporting a phase complete)
 
-- [ ] `pnpm check` passes; outputs recorded in `docs/DAILY_LOG.md`.
+- [ ] `pnpm check` and `pnpm test:e2e` pass; outputs recorded in `docs/DAILY_LOG.md`.
 - [ ] Requirement statuses in `docs/PRD.md` updated with evidence links.
 - [ ] New decisions recorded as ADRs; assumptions updated.
-- [ ] Security review note for anything touching auth, RLS, service role, or external content.
-- [ ] No secrets, no personal data, no non-English strings.
+- [ ] Security review note for anything touching auth, RLS, service role, invitations or external content.
+- [ ] No secrets, no personal data, no non-English strings; CI green on GitHub.

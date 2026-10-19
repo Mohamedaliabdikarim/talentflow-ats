@@ -68,3 +68,61 @@ Not run: Playwright E2E (needs browsers and, for authenticated flows, a hosted S
 1. Owner approvals: create the hosted Supabase project (free tier is sufficient for the demo), approve the Azure App Service plan, approve creating a private GitHub repository.
 2. Phase 1: `src/server/auth.ts` guards, login/sign-out, invite link flow, bootstrap-admin script, admin organization provisioning actions with audit events, hosted migration push, E2E for auth.
 3. Phase 2: jobs, candidates, applications CRUD in the workspace routes.
+
+## 2026-10-19 (continued) — Phase 1 after the owner's approvals
+
+**Goal:** Act on the Phase 0 approvals (existing Supabase project, private GitHub repository, invitation-link onboarding, palette, fixed stages, no Azure yet), set up the read-only Supabase MCP server and official skills, prepare the hosted integration without applying anything, and implement authentication, authorization, provisioning and audit locally with tests.
+
+**Work completed (verified):**
+
+- Private repository created and pushed with full history: https://github.com/Mohamedaliabdikarim/talentflow-ats. Pre-push scan of `git log -p --all` for key patterns: no matches; no `.env*` tracked. Found and fixed `.env.example` being ignored by the `.env*` rule.
+- `.mcp.json` written by `claude mcp add --scope project --transport http supabase "<read-only URL for project zcxmyaxpftzwpzvmhslm>"`; `claude mcp list` shows the server as pending approval (OAuth needs an interactive session; steps in `docs/SUPABASE_INTEGRATION.md` §2). Connectivity not yet verified.
+- Official skills `supabase` 0.1.2 and `supabase-postgres-best-practices` 1.1.1 cloned, read (Markdown only), installed with `npx skills add … --yes`, reviewed via `git status`, committed.
+- `.env.local` prepared with the project URL only; keys left commented out for the owner (Supabase CLI is not logged in, by design).
+- Migration 0003 `activate_my_memberships()`; shared local-cluster helpers (`scripts/db/local-schema.ts`); custom type generator `pnpm db:types` (CLI `gen types --db-url` exits 1 here); typed Supabase clients.
+- Server layer: `src/server/auth.ts` (getCurrentUser, requireUser, isPlatformAdmin, requirePlatformAdmin, getMyOrganizations, getOrganizationContext, requireOrgAccess), `src/server/audit.ts`, `runAction` wrapper, `signIn`/`signOut`/`setPassword` actions, `createOrganization`/`inviteUser`/`grantPlatformAdmin` actions (service role only after a database-backed admin check; audit rows with ids only; invite link returned once).
+- Routes: `/login`, `/auth/confirm` (verifyOtp on `token_hash`), `/auth/set-password`, `/` router, `/no-access`, `/workspaces`, `/admin` (overview, organizations list/new/detail with invite form, platform admins with grant form, audit log), `/o/[orgSlug]` (overview with live counts, members) with the admin context banner and de-duplicated `admin.context_entered` audit.
+- UI: responsive app shell (sidebar / sheet), accessible form fields (labels, `aria-describedby`, focusable error summary, pending submit), one-time link component, permission-denied state.
+- Scripts: `scripts/bootstrap-admin.ts` (approval-gated), `scripts/db/hosted.mjs` (`link|list-remote|dry-run|push`, refuses a mismatched project ref), CI extended with Playwright.
+- Docs: `docs/SUPABASE_INTEGRATION.md` (identity, MCP, skills, pre-apply review, migration plan, invite limitations), ADR-015 … ADR-020, README, CLAUDE.md, tooling inventory, PRD/assumption/checklist statuses, deployment note on build-time inlining.
+
+**Files/commits:** `1a52dca` (.env.example), `3d0e051` (MCP config + skills), Phase 1 commit on `main` (see `git log --oneline`).
+
+**AI tools/skills used and why:** `supabase` skill security checklist for the migration review; `claude mcp add` for the server config; `gh` for repository and CI; Playwright for E2E; embedded PostgreSQL for RLS tests and type generation.
+
+**Human decisions and reasoning:** Owner approved Phase 0 and decided: reuse the existing project `talentflow-ats`; private repo; invitation links; palette and fonts; fixed stages; no customer self-service invites; no Azure yet; MCP read-only; hosted migrations only after an explicit plan approval.
+
+**Tests run and exact results:**
+
+| Command                               | Result                                                                                  |
+| ------------------------------------- | --------------------------------------------------------------------------------------- |
+| `pnpm lint`                           | Pass                                                                                    |
+| `pnpm typecheck`                      | Pass                                                                                    |
+| `pnpm test`                           | 74 passed / 74 in 4 files                                                               |
+| `pnpm db:verify`                      | 25 passed / 25 (3 migrations applied); repeated once to confirm file-order independence |
+| `pnpm build`                          | Pass; 15 routes, all dynamic except `/_not-found`                                       |
+| `pnpm test:e2e`                       | 10 passed / 10 (chromium + mobile), 14.7 s                                              |
+| GitHub Actions run #1                 | Failed: `LayoutProps` not found on clean checkout → fixed                               |
+| GitHub Actions after the Phase 1 push | Result recorded below once available                                                    |
+
+**Security/privacy review:**
+
+- Provisioning actions: `requirePlatformAdmin()` (database-backed) runs before `createAdminSupabase()`; unit tests prove non-admins never reach the service role and signed-out callers are redirected first.
+- Invitation tokens: built from `hashed_token`, returned once to the admin UI, never logged; audit metadata holds user ids and roles only (unit test asserts no email/token in the audit call). `redactInviteUrl()` available for logs.
+- `/auth/confirm` accepts only `invite|magiclink|recovery|email`, validates `next` with the open-redirect guard, and answers invalid/expired links with the same generic message.
+- `activate_my_memberships()` is `SECURITY DEFINER` but scoped to `auth.uid()`; `EXECUTE` revoked from `PUBLIC`; DB tests cover other users' rows and anonymous callers.
+- Build-time inlining of `NEXT_PUBLIC_*` discovered through a failing E2E run; documented in `.env.example` and `docs/DEPLOYMENT.md`.
+- Open items: audit write is best-effort (no shared transaction with the Auth API); `admin.context_entered` may also fire on link prefetch (de-duplicated per hour); orphaned auth users are possible if a membership insert fails after `generateLink` (re-inviting the same email now resumes as a pending invite).
+
+**Issues, risks, and compromises:**
+
+- MCP connectivity could not be verified in this non-interactive session; the owner's OAuth is required.
+- No hosted verification yet: migrations, bootstrap admin and the full invite flow wait for approval.
+- `supabase gen types` did not work without Docker; the custom generator covers the current schema and will be diffed against CLI/MCP output after the hosted apply.
+- Three of my own test bugs were found and fixed during the run (FormData `null`, cross-file seed leakage, enum ordering); recorded in `docs/AI_WORKFLOW.md` §5.
+
+**Next actions:**
+
+1. Owner: add keys to `.env.local`, approve the project MCP server and complete OAuth, review `docs/SUPABASE_INTEGRATION.md` §6 and approve the dry-run step.
+2. After approval: link, dry-run, push, advisors, bootstrap admin, hosted invite flow E2E, record results.
+3. Phase 2: jobs, candidates, applications CRUD in the workspace (data layer, actions, pages, tests).

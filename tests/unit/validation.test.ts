@@ -70,6 +70,17 @@ describe("candidateInputSchema", () => {
     expect(result).toEqual({ fullName: "Ada Example" });
   });
 
+  it("treats absent FormData fields (null) as not provided", () => {
+    const result = candidateInputSchema.parse({
+      fullName: "Ada Example",
+      email: null,
+      linkedinUrl: null,
+      githubUrl: null,
+      notes: null,
+    });
+    expect(result).toEqual({ fullName: "Ada Example" });
+  });
+
   it("rejects an invalid email and a too-short name", () => {
     const result = candidateInputSchema.safeParse({ fullName: "A", email: "nope" });
     expect(result.success).toBe(false);

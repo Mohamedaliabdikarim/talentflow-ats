@@ -1,7 +1,11 @@
 import { z } from "zod";
 
-/** HTML forms submit empty strings for untouched fields; treat those as "not provided". */
+/**
+ * HTML forms submit empty strings for untouched fields and FormData.get() returns null for
+ * absent ones; both mean "not provided".
+ */
 export function emptyToUndefined(value: unknown): unknown {
+  if (value === null) return undefined;
   return typeof value === "string" && value.trim() === "" ? undefined : value;
 }
 

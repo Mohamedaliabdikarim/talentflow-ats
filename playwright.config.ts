@@ -1,12 +1,16 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * End-to-end tests run against an already built application (`pnpm build && pnpm start`)
- * or any URL given in PLAYWRIGHT_BASE_URL (for example the Azure deployment).
- * Authenticated scenarios additionally need a hosted Supabase project and the
- * E2E_* credentials documented in docs/TEST_PLAN.md.
+ * End-to-end tests run against the standalone build (`pnpm build && pnpm start`) or any
+ * URL given in PLAYWRIGHT_BASE_URL (for example the Azure deployment).
+ *
+ * The smoke suite needs no Supabase project: placeholder public values let the proxy run
+ * its cookie-only checks. Authenticated scenarios (Phase 3+) need a hosted project and
+ * the E2E_* credentials documented in docs/TEST_PLAN.md.
  */
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+// 127.0.0.1 rather than localhost: Node may resolve localhost to ::1 first, which the
+// standalone server (bound to 127.0.0.1) does not listen on.
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
 
 export default defineConfig({
   testDir: "tests/e2e",
@@ -27,8 +31,17 @@ export default defineConfig({
     ? undefined
     : {
         command: "pnpm start",
-        url: "http://localhost:3000/api/health",
+        url: "http://127.0.0.1:3000/api/health",
         reuseExistingServer: !process.env.CI,
         timeout: 60_000,
+        env: {
+          PORT: "3000",
+          HOSTNAME: "127.0.0.1",
+          NEXT_PUBLIC_SUPABASE_URL:
+            process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
+          NEXT_PUBLIC_SUPABASE_ANON_KEY:
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-anon-key",
+          NEXT_PUBLIC_APP_URL: "http://localhost:3000",
+        },
       },
 });

@@ -1,4 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr";
+import type { Database } from "@/lib/supabase/database.types";
 
 /**
  * Browser client for client components (for example auth state listeners).
@@ -10,5 +11,5 @@ export function createBrowserSupabase() {
   if (!url || !anonKey) {
     throw new Error("Supabase public environment variables are not configured");
   }
-  return createBrowserClient(url, anonKey);
+  return createBrowserClient<Database>(url, anonKey);
 }

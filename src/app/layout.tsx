@@ -22,7 +22,9 @@ export const metadata: Metadata = {
   description: "Multi-tenant applicant tracking for recruiting teams.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+// Explicit prop type: the generated LayoutProps global only exists after `next build`
+// or `next typegen`, so relying on it breaks `tsc` on a clean checkout (CI run #1).
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     // suppressHydrationWarning: next-themes sets the theme class on <html> before hydration.
     <html

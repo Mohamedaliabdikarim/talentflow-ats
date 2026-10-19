@@ -1,12 +1,18 @@
 # Continuous integration: lint, type-check, unit tests, migration + RLS tests on an
-# embedded PostgreSQL, production build, and a guard that the service-role key name
-# never appears in client bundles. Deployment is a separate, approval-gated workflow.
+# embedded PostgreSQL, production build, a guard that the service-role key name never
+# appears in client bundles, and the Playwright smoke suite against the standalone build.
+# Deployment is a separate, approval-gated workflow.
 name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
+
+env:
+  NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
+  NEXT_PUBLIC_APP_URL: http://localhost:3000
 
 jobs:
   verify:
@@ -34,9 +40,6 @@ jobs:
       - run: pnpm db:verify
 
       - run: pnpm build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
 
       - name: Service-role key name must not reach client bundles
         run: |
@@ -44,3 +47,14 @@ jobs:
             echo "Server-only environment variable referenced from a client bundle"
             exit 1
           fi
+
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - run: pnpm test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7

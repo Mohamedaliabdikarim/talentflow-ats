@@ -1,6 +1,6 @@
 # TalentFlow ATS — Architecture
 
-**Status:** Phase 0 design. Scaffold, migrations, environment and Supabase client layer, proxy, validation schemas and tests exist; feature code is planned.
+**Status:** Phase 1 implemented locally (auth, guards, provisioning, audit, admin area, workspace shell); jobs/candidates/pipeline are Phase 2–3. Nothing is applied to the hosted project or deployed yet.
 
 ## 1. System context
 
