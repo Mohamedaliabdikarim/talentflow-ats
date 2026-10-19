@@ -226,3 +226,29 @@ Not run: Playwright E2E (needs browsers and, for authenticated flows, a hosted S
 1. Owner: review `docs/HOSTED_MIGRATION_DRY_RUN.md`, add the three variables to `.env.local`, approve steps 1–3.
 2. After the dry-run: separate approval for `push`, then advisors, type diff, bootstrap admin, hosted invite-flow E2E.
 3. Phase 3 continued: responsive review at 375/768/1024/1440 px, screenshots and authenticated E2E once accounts exist.
+
+## 2026-10-19 (continued) — Dry-run prerequisites, independent CLI validation, Phase 3 polish
+
+**Goal:** Prepare (not execute) the hosted migration dry-run: validate the Supabase CLI requirements and scoped-token permissions from primary sources, configure every prerequisite that needs no secret, give the owner a secure path for the two secrets, and continue Phase 3 polish.
+
+**Verified (with evidence):**
+
+- **Official permission requirement for `supabase link`** (personal-access-tokens page, fetched directly): "`supabase link` needs **Project Settings**, **API Keys**, and **API Key Secrets**, all with **Read** access." Also: "Database commands using your database password aren't limited by the token's permissions"; scoped tokens "start with `sbp_fc`"; the CLI reads `SUPABASE_ACCESS_TOKEN`, which "takes precedence over any saved token"; the browser flow of `supabase login` "creates a classic token". The read-only MCP permission set (Database, Migrations, Project Settings, API Keys at Read) is therefore **not** sufficient for `link`: API Key Secrets (Read) is additionally required; `Migrations` and `Projects (account-wide)` are not needed for link, list or dry-run.
+- **CLI reference pages** retrieved through the read-only MCP `search_docs` tool: `link` fetches PostgREST config and optionally validates database settings with a password (`SUPABASE_DB_PASSWORD` for non-interactive use; password saved to native credential storage); `migration list` and `db push` require a linked project and compare/apply against `supabase_migrations.schema_migrations`; `--dry-run` "view[s] the list of changes before applying".
+- **CLI source (v2.121.0, `apps/cli-go/internal/migration/list/list.go`)**: `loadRemoteVersions` opens a direct database connection with `utils.ConnectByConfig`; no Management API call. The `link` and `db push` implementations are not present under `apps/cli-go/internal` at that tag (the repository is being restructured into a monorepo: `apps/cli`, `apps/cli-go`, `apps/cli-e2e`, `apps/docs`), so for those two commands the official reference pages and the permissions page are the authoritative sources used here.
+- **Prerequisites set without secrets:** `SUPABASE_PROJECT_REF` written; `NEXT_PUBLIC_SUPABASE_ANON_KEY` obtained with the read-only MCP tool `get_publishable_keys` in a headless session whose output was piped through a pattern filter into `pnpm env:set`, so the value never appeared in chat, terminal output or logs. `pnpm env:check` lists names and lengths only.
+- **Secure secret entry:** `scripts/env/set-local.mjs` (`pnpm env:set NAME`) reads a hidden prompt or stdin, writes only the git-ignored `.env.local`, refuses values containing whitespace, and prints just the character count.
+- **Phase 3 polish:** reference screenshots of the login page at 375/768/1440 px in `docs/screenshots/` with an assertion of no horizontal page scroll (`tests/e2e/screenshots.spec.ts`, opt-in via `SCREENSHOTS=1`); visual check of the mobile and desktop captures: card, error alert, labels and primary action render as designed. Regular E2E suite still 14/14.
+
+**Pending (not done, by design):**
+
+- `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`: owner enters them with `pnpm env:set`.
+- Steps `link`, `list-remote`, `dry-run`: wait for the owner's explicit approval after `pnpm env:check` reports all present.
+- `db push`, `pnpm bootstrap:admin`, deployment: not approved; not run.
+- Authenticated-page screenshots and E2E: need hosted accounts.
+
+**Files/commits:** `b3f4df3` (prerequisites, env helpers, screenshots); GitHub Actions run 39305014544 → success (lint, typecheck, unit 92, db:verify 31, build, bundle grep, Playwright 14).
+
+**Security/privacy review:** no secret value passed through chat, logs or git; `.env.local` remains ignored; the wrapper still refuses a mismatched project ref; MCP remains read-only and was used only for `search_docs` and `get_publishable_keys` (a public key by design).
+
+**Next actions:** owner completes §5 of `docs/HOSTED_MIGRATION_DRY_RUN.md` and approves §8; then link → list-remote → dry-run, stop, report verbatim.

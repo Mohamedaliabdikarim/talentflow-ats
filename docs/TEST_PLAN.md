@@ -96,6 +96,16 @@ Unit count note: 73 before and 74 after the pending-invite refinement in `invite
 | `pnpm test:e2e`                                     | 14 passed / 14                                       | 10 smoke + 4 axe accessibility checks                                         |
 | GitHub Actions run 39302083064 (commit `62bbdbd`)   | Success                                              | Clean Ubuntu checkout: all steps green, including db:verify (31) and E2E (14) |
 
+### 2026-10-19 — Phase 3b (same machine)
+
+| Command / call                                                | Result                                                            | Notes                                     |
+| ------------------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------- |
+| MCP `search_docs` (read-only, headless session)               | CLI reference pages for link / db push / migration list retrieved | used for the dry-run plan validation      |
+| MCP `get_publishable_keys` (read-only, piped)                 | publishable key written to `.env.local` without display           | `pnpm env:check` shows names/lengths only |
+| `SCREENSHOTS=1 playwright test tests/e2e/screenshots.spec.ts` | 3 passed (375/768/1440 px), no horizontal overflow                | images in `docs/screenshots/`             |
+| `pnpm test:e2e`                                               | 14 passed / 14 (screenshot tests skipped by default)              |                                           |
+| GitHub Actions run 39305014544 (commit `b3f4df3`)             | Success                                                           | all steps green                           |
+
 ### Not yet executed
 
 - Anything against the hosted Supabase project (migrations, users, auth flows): awaiting approval.
