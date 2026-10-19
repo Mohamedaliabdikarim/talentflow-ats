@@ -52,7 +52,7 @@ Spacing scale (dense): 4, 8, 12, 16, 24, 32 px. Radius: 8 px cards, 6 px control
 
 Installed primitives: button, card, input, label, dialog, select, badge, separator, sheet, table, dropdown-menu, avatar, skeleton, tabs, textarea, sonner (toasts), tooltip, popover, command, alert, scroll-area.
 
-App components to build: `AppShell`, `OrgSwitcher`, `AdminContextBanner`, `JobForm`, `CandidateForm`, `ApplicationCreateDialog`, `KanbanBoard`, `KanbanColumn`, `KanbanCard`, `PipelineFilters`, `EmptyState`, `PermissionDenied`, `ExternalLink` (safe `rel="noopener noreferrer"`), `StageBadge`.
+App components (built in Phases 1–2): `AppShell`, `MobileNav`, `NavLink`, `AdminContextBanner`, `PermissionDenied`, `PageHeader`/`EmptyState`/`StatCard`, form fields (`TextField`, `TextAreaField`, `FormError`, `SubmitButton`), `LoginForm`, `SetPasswordForm`, `CreateOrganizationForm`, `InviteUserForm`, `GrantAdminForm`, `OneTimeLink`, `JobForm`, `CandidateForm`, `AddToPipelineDialog`, `ConfirmActionDialog`, `KanbanBoard` (columns + cards + move menu), `PipelineFilters`, `StageBadge`, `ExternalLink` (safe `rel="noopener noreferrer"`). Still planned: `OrgSwitcher` (multi-workspace users currently use `/workspaces`).
 
 ## 5. Motion plan (Motion for React, `motion/react`)
 

@@ -1,6 +1,6 @@
 # TalentFlow ATS — Architecture
 
-**Status:** Phase 1 implemented locally (auth, guards, provisioning, audit, admin area, workspace shell); jobs/candidates/pipeline are Phase 2–3. Nothing is applied to the hosted project or deployed yet.
+**Status:** Phases 1 and 2 implemented locally (auth, guards, provisioning, audit, admin area, jobs, candidates, applications, Kanban with filters). Pointer drag, E2E with real accounts and deployment are Phase 3–5. Nothing is applied to the hosted project or deployed yet.
 
 ## 1. System context
 

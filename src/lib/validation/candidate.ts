@@ -51,3 +51,10 @@ export const candidateInputSchema = z.object({
 });
 
 export type CandidateInput = z.infer<typeof candidateInputSchema>;
+
+/** Create form: optionally add the new candidate to a job in the same step. */
+export const createCandidateSchema = candidateInputSchema.extend({
+  jobId: z.preprocess(emptyToUndefined, z.uuid("Unknown job").optional()),
+});
+
+export type CreateCandidateInput = z.infer<typeof createCandidateSchema>;

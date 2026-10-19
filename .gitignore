@@ -46,3 +46,5 @@ next-env.d.ts
 /test-results
 !.env.example
 /supabase/.temp
+# personal Claude Code settings (MCP approvals, permissions)
+.claude/settings.local.json

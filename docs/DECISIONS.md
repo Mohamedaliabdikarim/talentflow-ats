@@ -261,3 +261,42 @@ Chronological architecture decision records. Statuses: Proposed | Approved | Imp
 - Implementation reference: `scripts/db/gen-types.ts`, `src/lib/supabase/database.types.ts`.
 - Verification evidence: `pnpm typecheck` passes with typed queries across the data layer.
 - Status: Implemented
+
+### ADR-021 — Kanban stage changes: menu action first, pointer drag as a Phase 3 enhancement
+
+- Date: 2026-10-19
+- Context / problem: The required board must let users move candidates between stages, persist the change, and remain keyboard and screen-reader accessible (WCAG 2.2 dragging alternative). Drag-and-drop alone fails that and is fragile on touch.
+- Options considered: dnd-kit; Motion `drag` with custom drop targets; a per-card "Move to stage" menu.
+- Chosen approach: Ship the menu first. `KanbanBoard` updates optimistically with `useOptimistic`, calls `moveApplicationStageAction`, announces the result in an `aria-live` region and a toast, and animates card movement between columns with Motion's shared layout (`layoutId`). Pointer drag will be layered on top of the same action in Phase 3.
+- Why this approach: One persistence path, accessible by default, reliable under test; the animation already shows where the card went.
+- Trade-offs / risks: No drag yet (planned); no manual ordering inside a column.
+- Security and privacy implications: Stage is validated against the enum server-side; the update is filtered by the URL organization and by RLS.
+- Implementation reference: `src/components/kanban/kanban-board.tsx`, `src/server/actions/applications.ts`.
+- Verification evidence: unit tests (`tests/unit/workspace-actions.test.ts`), DB tests (`tests/db/pipeline.test.ts` "stage moves"); browser verification against the hosted project pending.
+- Status: Implemented (local)
+
+### ADR-022 — Pipeline filters live in the URL and are applied in the database
+
+- Date: 2026-10-19
+- Context / problem: Job and candidate-name filters must combine correctly and be shareable.
+- Options considered: client-side filtering of all applications; PostgREST embedded `!inner` filter on the candidate name; a two-step query.
+- Chosen approach: A plain GET form writes `?job=<uuid>&q=<name>`. The server parses leniently (`parsePipelineFilters`), resolves candidate ids with an RLS-scoped `ilike` (wildcards escaped), then filters applications by job and candidate ids. The candidates list uses the same `ilike`.
+- Why this approach: Works without JavaScript, URLs are shareable, both filters are enforced in the database, and the two-step query avoids ambiguity around aliased embedded filters.
+- Trade-offs / risks: Two queries when a name filter is set; fine at this scale.
+- Security and privacy implications: Malformed input is ignored rather than erroring; the name pattern is escaped.
+- Implementation reference: `src/lib/pipeline.ts`, `src/server/data/pipeline.ts`, `src/components/kanban/pipeline-filters.tsx`.
+- Verification evidence: unit tests for parsing and escaping; DB test "job filter and name filter combine" and "never returns the other tenant's namesake".
+- Status: Implemented (local)
+
+### ADR-023 — Destructive actions confirm first; deletes cascade as documented
+
+- Date: 2026-10-19
+- Context / problem: Jobs, candidates and applications can be removed; accidental deletes must be unlikely and the data effects clear.
+- Options considered: no delete in v1; soft delete; hard delete with confirmation.
+- Chosen approach: Hard delete behind `ConfirmActionDialog` (a real form submit to a bound Server Action). Deleting a job removes its applications and keeps candidates; deleting a candidate removes their applications and insights; removing an application keeps both records.
+- Why this approach: Matches the schema's `on delete cascade` and the spec's "confirm before destructive actions"; soft delete would complicate RLS and filters for no v1 benefit.
+- Trade-offs / risks: No undo. Mitigated by the confirmation copy stating exactly what is removed.
+- Security and privacy implications: Deletes are filtered by the URL organization and RLS; the cascade is tested.
+- Implementation reference: `src/components/confirm-action-dialog.tsx`, delete actions in `src/server/actions/*.ts`.
+- Verification evidence: DB test "deleting a job removes its applications but keeps the candidates".
+- Status: Implemented (local)

@@ -20,6 +20,8 @@ export type OrganizationContext = {
   name: string;
   slug: string;
   status: Enums<"organization_status">;
+  /** The caller's user id, used for created_by columns. */
+  userId: string;
   /** Membership role, or null when the caller is a platform admin without membership. */
   role: Enums<"membership_role"> | null;
   isPlatformAdmin: boolean;
@@ -133,6 +135,7 @@ export const getOrganizationContext = cache(
 
     return {
       ...organization,
+      userId: user.id,
       role,
       isPlatformAdmin: admin,
       actingAsAdmin: admin && role === null,

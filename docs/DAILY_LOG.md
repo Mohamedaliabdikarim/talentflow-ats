@@ -126,3 +126,53 @@ Not run: Playwright E2E (needs browsers and, for authenticated flows, a hosted S
 1. Owner: add keys to `.env.local`, approve the project MCP server and complete OAuth, review `docs/SUPABASE_INTEGRATION.md` §6 and approve the dry-run step.
 2. After approval: link, dry-run, push, advisors, bootstrap admin, hosted invite flow E2E, record results.
 3. Phase 2: jobs, candidates, applications CRUD in the workspace (data layer, actions, pages, tests).
+
+## 2026-10-19 (continued) — MCP approval preparation and Phase 2
+
+**Goal:** Do every technical MCP step that does not need the owner, then implement jobs, candidates, applications and the Kanban board with job and candidate-name filtering, locally, with tests, documentation and CI.
+
+**Work completed (verified):**
+
+- MCP: `claude mcp` has no non-interactive OAuth command (checked `--help`). Pre-approved the project server with `enabledMcpjsonServers: ["supabase"]` in `.claude/settings.local.json` (git-ignored). The user-level `~/.claude.json` has no entry for this project folder yet, so the CLI health check still prints "pending approval" until the owner runs `claude` in the project directory. Remaining owner step: `/mcp` → `supabase` → Authenticate (browser). Connectivity not yet verified.
+- Server layer: `src/server/data/{jobs,candidates,pipeline}.ts`, Server Actions for jobs (create, update, delete), candidates (create with optional job, update, delete) and applications (add to pipeline, move stage, remove). Every write takes `organization_id` from the URL context through `requireOrgAccess()`, never from the form.
+- Pure helpers in `src/lib/pipeline.ts` (grouping, LIKE escaping, stage age, lenient filter parsing) and `createCandidateSchema`.
+- UI: jobs list/new/detail/edit, candidates list (name search)/new/detail/edit, pipeline page with URL filters and the `KanbanBoard` (six columns, menu-based move with optimistic update, live-region announcement, Motion shared-layout movement), `AddToPipelineDialog`, `ConfirmActionDialog`, `StageBadge`, `ExternalLink`; workspace navigation and overview updated.
+- Tests: `tests/unit/pipeline.test.ts`, `tests/unit/workspace-actions.test.ts` (tenant pinning, authorization, validation, error mapping), `tests/db/pipeline.test.ts` (tenant-scoped search and filters, stage persistence across requests, cross-tenant move rejected, job delete cascade).
+- Docs: ADR-021 … ADR-023, PRD statuses R04–R09 and R20, architecture status, checklist, design component inventory.
+
+**Files/commits:** Phase 2 commit on `main` (see `git log --oneline`).
+
+**AI tools/skills used and why:** `supabase` skill for RLS-aware query shapes (explicit `organization_id` filters, `with check` reliance), React Compiler lint (`react-hooks/purity`) caught `Date.now()` in render; embedded PostgreSQL for the pipeline suite.
+
+**Human decisions and reasoning:** Owner asked for MCP approval guidance with minimal interaction, read-only verification, and Phase 2 locally; no hosted changes.
+
+**Tests run and exact results:**
+
+| Command                       | Result                                           |
+| ----------------------------- | ------------------------------------------------ |
+| `pnpm lint`                   | Pass (after moving the timestamp out of render)  |
+| `pnpm typecheck`              | Pass                                             |
+| `pnpm test`                   | 89 passed / 89 in 6 files                        |
+| `pnpm db:verify`              | 31 passed / 31 in 3 files (3 migrations applied) |
+| `pnpm build`                  | Pass; all workspace routes dynamic               |
+| `pnpm test:e2e`               | 10 passed / 10 (chromium + mobile), 19.5 s       |
+| GitHub Actions (Phase 2 push) | Recorded below                                   |
+
+**Security/privacy review:**
+
+- Tenant pinning is unit-tested: a form carrying `organization_id` of another tenant is ignored; RLS `with check` is the second line.
+- Cross-tenant stage moves return 0 rows (DB test); deleting cascades only inside the tenant.
+- Candidate URLs are validated by host on input and rendered with `rel="noopener noreferrer"` in a new tab; LinkedIn is shown as "Profile provided — manual review".
+- Name search escapes `%`, `_` and `\` before `ilike`; filter parsing never throws on user input.
+- Destructive actions require a confirmation dialog and submit a real form.
+
+**Issues, risks, and compromises:**
+
+- Pointer drag-and-drop is deferred to Phase 3 (ADR-021); the menu path is the required, accessible mechanism.
+- Browser verification of authenticated pages still depends on the hosted project (migrations and a bootstrap admin are approval-gated).
+- No manual ordering inside a Kanban column.
+
+**Next actions:**
+
+1. Owner: complete MCP OAuth; approve the hosted migration dry-run (`docs/SUPABASE_INTEGRATION.md` §6), then the push and the bootstrap admin.
+2. Phase 3: pointer drag on the board, responsive polish, Playwright flows with real accounts once the hosted project is ready, accessibility review.

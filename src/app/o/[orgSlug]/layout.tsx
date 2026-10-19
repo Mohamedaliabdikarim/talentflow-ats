@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users } from "lucide-react";
+import { Briefcase, LayoutDashboard, LayoutGrid, UserRound, Users } from "lucide-react";
 import { AdminContextBanner } from "@/components/admin-context-banner";
 import { AppShell } from "@/components/app-shell";
 import type { NavItem } from "@/components/nav-link";
@@ -24,9 +24,11 @@ export default async function WorkspaceLayout({
   }
 
   const base = `/o/${organization.slug}`;
-  // Jobs, candidates and the pipeline are added to this navigation in Phase 2 and 3.
   const nav: NavItem[] = [
     { href: base, label: "Overview", icon: LayoutDashboard, exact: true },
+    { href: `${base}/jobs`, label: "Jobs", icon: Briefcase },
+    { href: `${base}/candidates`, label: "Candidates", icon: UserRound },
+    { href: `${base}/pipeline`, label: "Pipeline", icon: LayoutGrid },
     { href: `${base}/members`, label: "Members", icon: Users },
   ];
 
