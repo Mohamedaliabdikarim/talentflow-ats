@@ -37,7 +37,7 @@
 ## 4. Azure App Service steps (planned)
 
 1. Resource group, App Service plan (Linux), Web App (Node 22).
-2. Application settings = the environment variables above; `WEBSITES_PORT=3000`; `SCM_DO_BUILD_DURING_DEPLOYMENT=false`.
+2. Application settings = the environment variables above (never set `TALENTFLOW_PREVIEW`; it would expose the synthetic-data preview routes); `WEBSITES_PORT=3000`; `SCM_DO_BUILD_DURING_DEPLOYMENT=false`.
 3. Deployment: GitHub Actions workflow builds with pnpm, runs tests, uploads `.next/standalone` + `.next/static` + `public` as the artifact, deploys with `azure/webapps-deploy` using a publish profile stored as a GitHub secret.
 4. Health check path: `/api/health`.
 5. HTTPS only; minimum TLS 1.2.

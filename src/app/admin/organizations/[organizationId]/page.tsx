@@ -5,16 +5,8 @@ import { ExternalLink } from "lucide-react";
 import { InviteUserForm } from "@/components/forms/invite-user-form";
 import { FadeIn } from "@/components/motion/fade-in";
 import { formatDateTime, PageHeader } from "@/components/page-header";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { MembersTable } from "@/components/views/members-table";
 import { getOrganizationById, listOrganizationMembers } from "@/server/data/admin";
 
 export const metadata: Metadata = { title: "Organization" };
@@ -43,45 +35,12 @@ export default async function OrganizationDetailPage({
           </Button>
         }
       />
-      <div className="grid gap-8 lg:grid-cols-[1fr_minmax(320px,400px)]">
-        <section>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
+        <section className="min-w-0">
           <h2 className="text-lg font-semibold">Members</h2>
-          {members.length === 0 ? (
-            <p className="mt-2 text-sm text-muted-foreground">
-              No members yet. Invite the first user with the form.
-            </p>
-          ) : (
-            <div className="mt-3 rounded-lg border bg-card">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Since</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {members.map((member) => (
-                    <TableRow key={member.membershipId}>
-                      <TableCell className="font-medium">{member.email}</TableCell>
-                      <TableCell>{member.fullName || "—"}</TableCell>
-                      <TableCell className="capitalize">{member.role}</TableCell>
-                      <TableCell>
-                        <Badge variant={member.status === "active" ? "secondary" : "outline"}>
-                          {member.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {formatDateTime(member.createdAt)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+          <div className="mt-3">
+            <MembersTable members={members} />
+          </div>
         </section>
         <section>
           <h2 className="text-lg font-semibold">Invite a user</h2>

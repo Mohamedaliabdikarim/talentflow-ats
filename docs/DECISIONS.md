@@ -300,3 +300,16 @@ Chronological architecture decision records. Statuses: Proposed | Approved | Imp
 - Implementation reference: `src/components/confirm-action-dialog.tsx`, delete actions in `src/server/actions/*.ts`.
 - Verification evidence: DB test "deleting a job removes its applications but keeps the candidates".
 - Status: Implemented (local)
+
+### ADR-024 — Local preview mode: real views, synthetic data, production-gated
+
+- Date: 2026-10-19
+- Context / problem: The owner wants to inspect the dashboard, jobs, candidates and the Kanban board in a browser before approving the hosted migration push, so no account can sign in yet.
+- Options considered: (a) wait for the push and a bootstrap admin; (b) a local Supabase stack (needs Docker, not available); (c) a preview route tree that renders the same view components with synthetic data and an in-memory store.
+- Chosen approach: (c). Page bodies were extracted into `src/components/views/*` so the real routes and `/preview/*` render identical UI. The preview uses `src/preview/demo-data.ts` (fictional people, example.test addresses), an in-memory store on `globalThis` for Kanban moves, a preview Server Action with the same contract as the real one, and disabled forms for visual review. `isPreviewEnabled()` returns true outside production or with `TALENTFLOW_PREVIEW=1`; otherwise the layout is a 404 and the proxy keeps `/preview` behind authentication.
+- Why this approach: Gives a faithful visual and interaction review now, doubles as browser-level E2E coverage (Playwright + axe) of pages that otherwise need hosted accounts, and removes duplicated JSX between real and preview routes.
+- Trade-offs / risks: One more code path to keep in sync (mitigated by sharing the views); the production build must never set the flag (documented in `docs/SECURITY.md` and `docs/DEPLOYMENT.md`).
+- Security and privacy implications: No real data, no Supabase calls, no session; unreachable in the Azure deployment by default; CI enables the flag only for the Playwright web server.
+- Implementation reference: `src/preview/`, `src/app/preview/`, `src/components/views/`, `src/proxy.ts`.
+- Verification evidence: `tests/unit/preview-enabled.test.ts`, `tests/unit/preview-store.test.ts`, `tests/e2e/preview.spec.ts` (see `docs/DAILY_LOG.md`).
+- Status: Implemented

@@ -46,7 +46,7 @@ Spacing scale (dense): 4, 8, 12, 16, 24, 32 px. Radius: 8 px cards, 6 px control
 
 - **App shell:** left sidebar (collapsible to icons at ≥ 768 px, sheet drawer below), compact top bar with organization name, context banner for admins, and the user menu.
 - **Responsive breakpoints:** 375, 768, 1024, 1440 px. No horizontal page scroll; the Kanban scrolls horizontally inside its own region with visible affordance.
-- **Responsive review (2026-10-19, public pages):** `tests/e2e/screenshots.spec.ts` (`SCREENSHOTS=1`) captures the login page at 375, 768 and 1440 px into `docs/screenshots/` and asserts there is no horizontal page scroll. Tables use shadcn's overflow container; the Kanban board scrolls inside its own region. Authenticated pages are reviewed the same way once test accounts exist.
+- **Responsive review (2026-10-19, public pages):** `tests/e2e/screenshots.spec.ts` (`SCREENSHOTS=1`) captures the login page and, through the local preview, the dashboard, jobs, job detail, candidates, candidate detail, pipeline and admin overview at 375, 768 and 1440 px into `docs/screenshots/` (24 images) and asserts there is no horizontal page scroll. Tables use shadcn's overflow container; the Kanban board scrolls inside its own region. Authenticated pages are reviewed the same way once test accounts exist.
 - **Pages:** Login · Admin Overview · Organizations (list, create) · Organization Workspace overview · Jobs (list, create/edit, detail) · Candidates (list, create/edit, detail) · Pipeline (Kanban) · Members · Settings · optional AI Insights panel inside Candidate detail.
 
 ## 4. Components (shadcn/ui, Radix base)

@@ -2,12 +2,49 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  Briefcase,
+  Building2,
+  LayoutDashboard,
+  LayoutGrid,
+  type LucideIcon,
+  ScrollText,
+  ShieldCheck,
+  UserRound,
+  Users,
+} from "lucide-react";
 import { cn } from "cn";
+
+/**
+ * Icons are referenced by name: Server Components may only pass serializable props to
+ * Client Components, and a component reference is a function. The client resolves the
+ * name to the Lucide component here.
+ */
+export type NavIconName =
+  | "dashboard"
+  | "organizations"
+  | "admins"
+  | "audit"
+  | "jobs"
+  | "candidates"
+  | "pipeline"
+  | "members";
+
+const NAV_ICONS: Record<NavIconName, LucideIcon> = {
+  dashboard: LayoutDashboard,
+  organizations: Building2,
+  admins: ShieldCheck,
+  audit: ScrollText,
+  jobs: Briefcase,
+  candidates: UserRound,
+  pipeline: LayoutGrid,
+  members: Users,
+};
 
 export type NavItem = {
   href: string;
   label: string;
-  icon: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+  icon: NavIconName;
   /** Match only the exact path (for overview pages that are prefixes of others). */
   exact?: boolean;
 };
@@ -15,7 +52,7 @@ export type NavItem = {
 export function NavLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
   const pathname = usePathname();
   const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
-  const Icon = item.icon;
+  const Icon = NAV_ICONS[item.icon];
   return (
     <Link
       href={item.href}

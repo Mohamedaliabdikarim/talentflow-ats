@@ -331,3 +331,34 @@ Reading: exactly the three committed migrations, in timestamp order; `seeds: []`
 **Verified vs pending:** link, list-remote, dry-run verified; push, bootstrap admin, hosted dashboard auth settings (signups off, OTP expiry, redirect URLs), deployment pending separate approval.
 
 **Security/privacy review:** outputs passed through the redaction filter (nothing matched); the pooler URL with the password was passed to the CLI process only and masked in the wrapper's echo; `.env.local` untouched by the CLI; working tree clean after both steps.
+
+## 2026-10-19 (continued) — Local preview for visual inspection; two real bugs found and fixed
+
+**Request:** the owner wants to inspect the dashboard, jobs, candidates and the Kanban board in a browser before approving the hosted push. Sign-in cannot work yet (hosted schema empty), so a local-only preview was built (ADR-024). No hosted change; `db push` not run.
+
+**Work completed (verified):**
+
+- Page bodies extracted into reusable view components (`src/components/views/*`: workspace overview, jobs, job detail, candidates, candidate detail, pipeline, members, admin overview/organizations, audit). The real routes and the preview routes now render the same components.
+- `/preview/*` route tree with synthetic data (`src/preview/demo-data.ts`: fictional people, example.test addresses, valid UUIDs), an in-memory store on `globalThis` so Kanban moves persist while the server runs, a preview Server Action with the same contract as the real one, a "Reset demo data" action, and disabled forms (`<fieldset disabled>`) for visual review. Gate: `isPreviewEnabled()` (development, or `TALENTFLOW_PREVIEW=1`); the proxy exempts `/preview` from authentication only under the same condition; otherwise the layout is a 404.
+- Dev server started locally: `pnpm dev -p 3100` → **http://localhost:3100/preview** (index with links to every page). All preview routes return HTTP 200.
+- **Bug 1 (would have broken the real app):** navigation items passed Lucide icon _components_ from Server Components (layouts) into the client `NavLink`/`MobileNav`. React Server Components forbid functions as client props; every authenticated layout would have failed at runtime with "Functions cannot be passed directly to Client Components" (digest 1569319357). Found the moment the preview rendered the shell; fixed by passing icon _names_ that the client resolves (`src/components/nav-link.tsx`). The authenticated routes had never been rendered in a browser before, which is exactly why the preview was worth building.
+- **Bug 2 (responsive):** on the job and candidate detail pages, tables inside grid children widened the page at ≤ 768 px (grid items default to `min-width: auto`). Caught by the screenshot test's no-horizontal-scroll assertion; fixed with `min-w-0` on the grid children (also applied to the admin organization and admins pages).
+- ESLint now ignores Playwright's generated `playwright-report/` and `test-results/`.
+- Tests: `tests/unit/preview-store.test.ts`, `tests/unit/preview-enabled.test.ts`, `tests/e2e/preview.spec.ts` (index, dashboard incl. mobile sheet navigation, jobs → detail, candidate search → detail with safe links, pipeline: six stages, job filter, combined name filter, menu move announced and persisted across reload, reset; empty-state; axe on five preview pages), `tests/e2e/screenshots.spec.ts` now captures eight pages × three breakpoints (24 images in `docs/screenshots/`).
+
+**Tests run and exact results:**
+
+| Command                                                                          | Result                                                                                                                                                                                |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm lint` / `pnpm typecheck`                                                   | Pass                                                                                                                                                                                  |
+| `pnpm test`                                                                      | 99 passed / 99 in 9 files                                                                                                                                                             |
+| `pnpm build`                                                                     | Pass (preview routes dynamic)                                                                                                                                                         |
+| `pnpm test:e2e`                                                                  | 35 passed (49 skipped: screenshot captures off by default and the mutating board test limited to one project); covers smoke, axe and the preview pages on desktop and mobile Chromium |
+| `SCREENSHOTS=1 playwright test tests/e2e/screenshots.spec.ts --project=chromium` | 24 passed; no horizontal overflow on any page at 375/768/1440 px                                                                                                                      |
+| Dev server probe (`curl`, port 3100)                                             | 200 on index, admin, dashboard, jobs, job detail, job form, candidates, candidate detail, pipeline (with filters), members                                                            |
+
+**Visual review notes (from the captures):** board shows six columns with counts, cards with candidate, headline, job and stage age; the board scrolls horizontally inside its own region at 1440 px (Offer column partially visible); mobile dashboard uses the sheet navigation and stacked stat cards. Owner's visual feedback pending.
+
+**Security/privacy review:** preview is unreachable in production unless `TALENTFLOW_PREVIEW=1` (unit-tested; documented in `docs/SECURITY.md` and `docs/DEPLOYMENT.md`); no Supabase calls from preview code; synthetic data only.
+
+**Verified vs pending:** preview and the two fixes verified locally and by E2E; owner's visual feedback pending; hosted push, bootstrap admin, deployment not approved and not run.

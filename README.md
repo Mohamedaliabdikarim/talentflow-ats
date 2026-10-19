@@ -39,6 +39,8 @@ pnpm test:e2e      # Playwright smoke suite against the standalone build (pnpm e
 pnpm check         # lint + typecheck + test + db:verify + build
 ```
 
+**Local preview without an account:** `pnpm dev` then open `http://localhost:3000/preview` (synthetic data, real components, Kanban moves kept in memory; disabled forms). Unreachable in production unless `TALENTFLOW_PREVIEW=1` is set.
+
 Hosted operations are explicit and approval-gated: `pnpm supabase:hosted <link|list-remote|dry-run|push>` and `pnpm bootstrap:admin …` read credentials from `.env.local` only. See `docs/SUPABASE_INTEGRATION.md`.
 
 ## Repository layout

@@ -6,6 +6,7 @@ import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { useCallback, useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { cn } from "cn";
+import type { ActionState } from "@/lib/action-state";
 import { stageIcon } from "@/components/stage-badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,11 +28,21 @@ import { moveApplicationStageAction } from "@/server/actions/applications";
 
 type Move = { id: string; stage: ApplicationStage };
 
+/** Contract of the Server Action that persists a stage change (real or preview). */
+export type MoveAction = (
+  orgSlug: string,
+  input: { applicationId: string; stage: string },
+) => Promise<ActionState>;
+
 type KanbanBoardProps = {
   orgSlug: string;
   cards: PipelineCard[];
   /** Server timestamp so "days in stage" renders identically on server and client. */
   now: number;
+  /** Root path for card links; defaults to the real workspace path. */
+  basePath?: string;
+  /** Defaults to the real Server Action; the preview passes an in-memory one. */
+  moveAction?: MoveAction;
 };
 
 const STAGE_SET = new Set<string>(APPLICATION_STAGES);
@@ -60,7 +71,13 @@ function stageAtPoint(event: MouseEvent | TouchEvent | PointerEvent): Applicatio
  *  - pointer drag onto another column (Phase 3 enhancement; columns highlight on hover).
  * Card movement between columns animates through Motion's shared layout.
  */
-export function KanbanBoard({ orgSlug, cards, now }: KanbanBoardProps) {
+export function KanbanBoard({
+  orgSlug,
+  cards,
+  now,
+  basePath = `/o/${orgSlug}`,
+  moveAction = moveApplicationStageAction,
+}: KanbanBoardProps) {
   const [optimisticCards, applyMove] = useOptimistic(cards, (state: PipelineCard[], move: Move) =>
     state.map((card) =>
       card.id === move.id
@@ -78,10 +95,7 @@ export function KanbanBoard({ orgSlug, cards, now }: KanbanBoardProps) {
       if (card.stage === stage) return;
       startTransition(async () => {
         applyMove({ id: card.id, stage });
-        const result = await moveApplicationStageAction(orgSlug, {
-          applicationId: card.id,
-          stage,
-        });
+        const result = await moveAction(orgSlug, { applicationId: card.id, stage });
         if (result.status === "error") {
           setAnnouncement(`Could not move ${card.candidateName}: ${result.message}`);
           toast.error(result.message);
@@ -92,7 +106,7 @@ export function KanbanBoard({ orgSlug, cards, now }: KanbanBoardProps) {
         toast.success(text);
       });
     },
-    [applyMove, orgSlug],
+    [applyMove, moveAction, orgSlug],
   );
 
   const handleDragOver = useCallback((stage: ApplicationStage | null) => {
@@ -138,7 +152,7 @@ export function KanbanBoard({ orgSlug, cards, now }: KanbanBoardProps) {
                       <KanbanCard
                         key={card.id}
                         card={card}
-                        orgSlug={orgSlug}
+                        basePath={basePath}
                         now={now}
                         onMove={move}
                         onDragOver={handleDragOver}
@@ -162,13 +176,13 @@ export function KanbanBoard({ orgSlug, cards, now }: KanbanBoardProps) {
 
 function KanbanCard({
   card,
-  orgSlug,
+  basePath,
   now,
   onMove,
   onDragOver,
 }: {
   card: PipelineCard;
-  orgSlug: string;
+  basePath: string;
   now: number;
   onMove: (card: PipelineCard, stage: ApplicationStage) => void;
   onDragOver: (stage: ApplicationStage | null) => void;
@@ -207,7 +221,7 @@ function KanbanCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <Link
-            href={`/o/${orgSlug}/candidates/${card.candidateId}`}
+            href={`${basePath}/candidates/${card.candidateId}`}
             className="block truncate text-sm font-medium underline-offset-4 hover:underline"
           >
             {card.candidateName}
@@ -236,14 +250,14 @@ function KanbanCard({
             ))}
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href={`/o/${orgSlug}/jobs/${card.jobId}`}>Open job</Link>
+              <Link href={`${basePath}/jobs/${card.jobId}`}>Open job</Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
       <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
         <Link
-          href={`/o/${orgSlug}/jobs/${card.jobId}`}
+          href={`${basePath}/jobs/${card.jobId}`}
           className="truncate underline-offset-4 hover:underline"
         >
           {card.jobTitle}

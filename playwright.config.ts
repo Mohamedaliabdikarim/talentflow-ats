@@ -42,6 +42,8 @@ export default defineConfig({
           NEXT_PUBLIC_SUPABASE_ANON_KEY:
             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-anon-key",
           NEXT_PUBLIC_APP_URL: "http://localhost:3000",
+          // The production build serves /preview only with this flag (tests/e2e/preview.spec.ts).
+          TALENTFLOW_PREVIEW: "1",
         },
       },
 });

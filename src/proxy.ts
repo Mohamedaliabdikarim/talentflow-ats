@@ -13,9 +13,15 @@ import { NextResponse, type NextRequest } from "next/server";
  */
 
 const PUBLIC_PREFIXES = ["/login", "/auth", "/api/health"];
+// Local preview (synthetic data) is public only when enabled; see src/preview/enabled.ts.
+const PREVIEW_ENABLED =
+  process.env.NODE_ENV !== "production" || process.env.TALENTFLOW_PREVIEW === "1";
 
 function isPublicPath(pathname: string): boolean {
   if (pathname === "/") return true;
+  if (PREVIEW_ENABLED && (pathname === "/preview" || pathname.startsWith("/preview/"))) {
+    return true;
+  }
   return PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 

@@ -23,8 +23,8 @@ export default async function PlatformAdminsPage() {
         title="Platform admins"
         description="People who can create organizations, invite users and act inside any workspace. Grants are audited."
       />
-      <div className="grid gap-8 lg:grid-cols-[1fr_minmax(320px,400px)]">
-        <section className="rounded-lg border bg-card">
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
+        <section className="min-w-0 rounded-lg border bg-card">
           <Table>
             <TableHeader>
               <TableRow>

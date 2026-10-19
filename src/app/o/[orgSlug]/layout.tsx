@@ -1,4 +1,3 @@
-import { Briefcase, LayoutDashboard, LayoutGrid, UserRound, Users } from "lucide-react";
 import { AdminContextBanner } from "@/components/admin-context-banner";
 import { AppShell } from "@/components/app-shell";
 import type { NavItem } from "@/components/nav-link";
@@ -25,11 +24,11 @@ export default async function WorkspaceLayout({
 
   const base = `/o/${organization.slug}`;
   const nav: NavItem[] = [
-    { href: base, label: "Overview", icon: LayoutDashboard, exact: true },
-    { href: `${base}/jobs`, label: "Jobs", icon: Briefcase },
-    { href: `${base}/candidates`, label: "Candidates", icon: UserRound },
-    { href: `${base}/pipeline`, label: "Pipeline", icon: LayoutGrid },
-    { href: `${base}/members`, label: "Members", icon: Users },
+    { href: base, label: "Overview", icon: "dashboard", exact: true },
+    { href: `${base}/jobs`, label: "Jobs", icon: "jobs" },
+    { href: `${base}/candidates`, label: "Candidates", icon: "candidates" },
+    { href: `${base}/pipeline`, label: "Pipeline", icon: "pipeline" },
+    { href: `${base}/members`, label: "Members", icon: "members" },
   ];
 
   return (

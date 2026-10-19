@@ -19,11 +19,12 @@ const ALL_JOBS = "all";
  * URL (?job=&q=) and works without JavaScript. Both filters combine on the server.
  */
 export function PipelineFilters({
-  orgSlug,
+  base,
   jobs,
   filters,
 }: {
-  orgSlug: string;
+  /** Workspace root path, e.g. /o/acme. */
+  base: string;
   jobs: Array<{ id: string; title: string }>;
   filters: Filters;
 }) {
@@ -31,7 +32,7 @@ export function PipelineFilters({
   return (
     <form
       method="get"
-      action={`/o/${orgSlug}/pipeline`}
+      action={`${base}/pipeline`}
       role="search"
       aria-label="Filter the pipeline"
       className="mb-6 flex flex-wrap items-end gap-3 rounded-lg border bg-card p-3"
@@ -70,7 +71,7 @@ export function PipelineFilters({
       </Button>
       {hasFilters ? (
         <Button asChild variant="ghost">
-          <Link href={`/o/${orgSlug}/pipeline`}>Clear</Link>
+          <Link href={`${base}/pipeline`}>Clear</Link>
         </Button>
       ) : null}
     </form>

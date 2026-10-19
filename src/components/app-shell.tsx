@@ -13,6 +13,8 @@ type AppShellProps = {
   userEmail: string;
   /** Rendered above the page content (admin context banner). */
   banner?: React.ReactNode;
+  /** False in the local preview, which has no session to sign out of. */
+  signOut?: boolean;
   children: React.ReactNode;
 };
 
@@ -21,7 +23,15 @@ type AppShellProps = {
  * below, compact top bar with the user menu. The sign-out control is a real form so it
  * works without JavaScript and cannot be triggered by a GET request.
  */
-export function AppShell({ title, subtitle, items, userEmail, banner, children }: AppShellProps) {
+export function AppShell({
+  title,
+  subtitle,
+  items,
+  userEmail,
+  banner,
+  signOut = true,
+  children,
+}: AppShellProps) {
   return (
     <div className="flex min-h-full flex-1">
       <aside className="hidden w-60 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground md:flex">
@@ -46,12 +56,16 @@ export function AppShell({ title, subtitle, items, userEmail, banner, children }
             <span className="hidden max-w-56 truncate text-sm text-muted-foreground sm:inline">
               {userEmail}
             </span>
-            <form action={signOutAction}>
-              <Button type="submit" variant="ghost" size="sm">
-                <LogOut aria-hidden="true" />
-                Sign out
-              </Button>
-            </form>
+            {signOut ? (
+              <form action={signOutAction}>
+                <Button type="submit" variant="ghost" size="sm">
+                  <LogOut aria-hidden="true" />
+                  Sign out
+                </Button>
+              </form>
+            ) : (
+              <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium">Preview</span>
+            )}
           </div>
         </header>
         {banner}
