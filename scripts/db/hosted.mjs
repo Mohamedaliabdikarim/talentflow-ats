@@ -13,11 +13,27 @@ import { spawnSync } from "node:child_process";
 const ref = process.env.SUPABASE_PROJECT_REF;
 const [command] = process.argv.slice(2);
 
+/**
+ * IPv4-only networks cannot reach the direct database host (IPv6). The CLI normally stores
+ * the Supavisor pooler route during `link`, which needs the token permission
+ * "Connection Pooling (Read)". As a fallback, SUPABASE_POOLER_HOST (the pooler host from the
+ * dashboard's Connect dialog, not a secret) makes the database commands use an explicit
+ * session-mode pooler URL. The URL carries the password and is passed to the CLI process
+ * only; it is never printed.
+ */
+const poolerHost = process.env.SUPABASE_POOLER_HOST;
+const target = poolerHost
+  ? [
+      "--db-url",
+      `postgresql://postgres.${ref}:${encodeURIComponent(process.env.SUPABASE_DB_PASSWORD ?? "")}@${poolerHost}:5432/postgres`,
+    ]
+  : ["--linked"];
+
 const commands = {
   link: ["link", "--project-ref", ref ?? ""],
-  "list-remote": ["migration", "list", "--linked"],
-  "dry-run": ["db", "push", "--dry-run", "--linked"],
-  push: ["db", "push", "--linked"],
+  "list-remote": ["migration", "list", ...target],
+  "dry-run": ["db", "push", "--dry-run", ...target],
+  push: ["db", "push", ...target],
   unlink: ["unlink"],
 };
 
@@ -38,7 +54,11 @@ if (!(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").includes(expectedHost)) {
   fail(`NEXT_PUBLIC_SUPABASE_URL does not point at ${expectedHost}; refusing to continue`);
 }
 
-console.log(`[hosted] project ${ref}: supabase ${commands[command].join(" ")}`);
+// Print the command without the connection URL (it embeds the password).
+const shown = commands[command].map((arg, index, all) =>
+  all[index - 1] === "--db-url" ? "<pooler-url>" : arg,
+);
+console.log(`[hosted] project ${ref}: supabase ${shown.join(" ")}`);
 const result = spawnSync("pnpm", ["exec", "supabase", ...commands[command]], {
   stdio: "inherit",
   shell: true,

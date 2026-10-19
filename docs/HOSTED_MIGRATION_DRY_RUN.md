@@ -1,4 +1,4 @@
-# Hosted migration dry-run plan — for owner review (v2)
+# Hosted migration dry-run plan — for owner review (v3)
 
 **Status:** Proposed 2026-10-19, revised the same day after validating the CLI requirements against the official documentation. Nothing in this plan changes the hosted database. The dry-run prints what _would_ be applied; the actual push is a separate, later approval.
 
@@ -38,6 +38,7 @@ Sources: the official _Personal Access Tokens_ page (fetched directly) and the C
 Consequences for the token:
 
 - The documented read-only MCP permissions (Database Read, Migrations Read, Project Settings Read, API Keys Read) are **not** the set `link` needs: `link` additionally requires **API Key Secrets (Read)**. `Projects (account-wide)` and `Migrations` permissions are **not** required for link, list or dry-run.
+- **Found in practice (2026-10-19):** on an IPv4-only network the CLI must use the Supavisor pooler, and `link` can only store that route if the token also has **Connection Pooling (Read)** (endpoint "Get pooler config"). With only the three documented permissions, `link` exits 0 but `migration list` then fails with `DbConfigIpv6Error`. Fallback without a new token: `SUPABASE_POOLER_HOST` makes the wrapper pass an explicit session-mode pooler URL (`--db-url`), see §5a.
 - `migration list` and `db push --dry-run` do not use the token at all; they use the database password over a direct connection. The token is only needed by `link`.
 - The CLI reads `SUPABASE_ACCESS_TOKEN` from the environment, which "takes precedence over any saved token". Scoped tokens start with `sbp_fc`; the browser flow of `supabase login` "creates a classic token" with full account access and is therefore not used here. The docs note that scoped tokens are "rolling out gradually"; if the permission picker is not offered on your account, the fallback is a classic token with the shortest expiry, revoked immediately after the push.
 
@@ -61,6 +62,11 @@ Consequences for the token:
 5. Tell me it is done. I will run `pnpm env:check` myself (names only) and then ask for your explicit approval of steps 1–3 below.
 
 Why not `supabase login`: it stores a classic full-account token. Why not `supabase login --token …`: the value would land in shell history.
+
+## 5a. Resolving the IPv6 stop (choose one)
+
+- **Option 1 (preferred):** generate a new scoped token with **Project Settings, API Keys, API Key Secrets, Connection Pooling**, all Read; `pnpm env:set SUPABASE_ACCESS_TOKEN`; revoke the old token. Then `link` is re-run so the pooler route is stored, followed by `list-remote` and `dry-run`.
+- **Option 2:** `pnpm env:set SUPABASE_POOLER_HOST` with the Supavisor host from the dashboard's Connect dialog (session mode, port 5432). The wrapper then runs `list-remote` and `dry-run` against that host with the existing password; no re-link needed.
 
 ## 6. Exact steps (each reported with its output before the next; none runs without your approval)
 

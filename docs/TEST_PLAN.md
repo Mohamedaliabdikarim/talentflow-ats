@@ -106,6 +106,15 @@ Unit count note: 73 before and 74 after the pending-invite refinement in `invite
 | `pnpm test:e2e`                                               | 14 passed / 14 (screenshot tests skipped by default)              |                                           |
 | GitHub Actions run 39305014544 (commit `b3f4df3`)             | Success                                                           | all steps green                           |
 
+### 2026-10-19 — Approved hosted steps (link, list-remote)
+
+| Command                            | Result                                                        | Notes                                                                                              |
+| ---------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `pnpm env:check` + target check    | all present; ref and URL host match `zcxmyaxpftzwpzvmhslm`    | names only                                                                                         |
+| `pnpm supabase:hosted link`        | exit 0, `{"project_ref":"zcxmyaxpftzwpzvmhslm","message":""}` | hosted PostgreSQL 17.11.0.003; project name `talentflow-ats` confirmed from saved metadata         |
+| `pnpm supabase:hosted list-remote` | exit 1, `DbConfigIpv6Error`                                   | IPv4-only network; pooler route not stored (token lacks Connection Pooling Read); sequence stopped |
+| `pnpm supabase:hosted dry-run`     | not run                                                       | per the stop rule                                                                                  |
+
 ### Not yet executed
 
 - Anything against the hosted Supabase project (migrations, users, auth flows): awaiting approval.

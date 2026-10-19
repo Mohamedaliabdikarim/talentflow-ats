@@ -252,3 +252,43 @@ Not run: Playwright E2E (needs browsers and, for authenticated flows, a hosted S
 **Security/privacy review:** no secret value passed through chat, logs or git; `.env.local` remains ignored; the wrapper still refuses a mismatched project ref; MCP remains read-only and was used only for `search_docs` and `get_publishable_keys` (a public key by design).
 
 **Next actions:** owner completes §5 of `docs/HOSTED_MIGRATION_DRY_RUN.md` and approves §8; then link → list-remote → dry-run, stop, report verbatim.
+
+## 2026-10-19 (continued) — Approved hosted steps: link succeeded, list-remote stopped on IPv6
+
+**Owner approval:** three non-destructive operations in order (`link`, `list-remote`, `dry-run`), stop on anything unexpected; no push, no users, no deploy.
+
+**Step 0 — prerequisites (names only):** `pnpm env:check` → all present. Target check: `SUPABASE_PROJECT_REF = zcxmyaxpftzwpzvmhslm`, URL host `zcxmyaxpftzwpzvmhslm.supabase.co` → OK. Working tree clean before starting.
+
+**Step 1 — `pnpm supabase:hosted link` → VERIFIED, exit 0.** Output (redaction filter applied to every line; nothing was redacted):
+
+```
+[hosted] project zcxmyaxpftzwpzvmhslm: supabase link --project-ref zcxmyaxpftzwpzvmhslm
+{"project_ref":"zcxmyaxpftzwpzvmhslm","message":""}
+```
+
+Effects: only git-ignored files under `supabase/.temp/` (`project-ref`, `linked-project.json`, `postgres-version`, `rest-version`, `gotrue-version`, `storage-version`); `git status` clean. Non-secret metadata read from them: hosted PostgreSQL **17.11.0.003** (matches the local verification on 17), PostgREST v14.18, GoTrue v2.197.0, and `linked-project.json` → `name: talentflow-ats`, which **confirms the project name** that the MCP server could not provide.
+
+**Step 2 — `pnpm supabase:hosted list-remote` → STOPPED, exit 1.** Output verbatim:
+
+```
+[hosted] project zcxmyaxpftzwpzvmhslm: supabase migration list --linked
+{"_tag":"Error","error":{"code":"DbConfigIpv6Error","message":"IPv6 is not supported on your current network","suggestion":"Run supabase link --project-ref zcxmyaxpftzwpzvmhslm to setup IPv4 connection."}}
+```
+
+Per the approval, the sequence stopped here; **step 3 (`dry-run`) was not run.** No hosted change occurred: `migration list` is read-only and it never connected.
+
+**Analysis (official docs via the read-only MCP `search_docs` tool, 2026-10-19):**
+
+- "Direct connections are on IPv6, or on IPv4 if the project has the IPv4 add-on. If your network is IPv4-only and you don't have the add-on, use pooler session mode instead." (Connect to your database)
+- "The Shared Pooler (Supavisor) is IPv4-only on every project tier." The docs also list GitHub Actions among IPv4-only platforms, which matters for any future CI-driven migration.
+- The CLI resolves the pooler route from the Management API endpoint "Get pooler config" (`GET /v1/projects/{ref}/config/database/pooler`), which on a scoped token requires **Connection Pooling (Read)** (Personal Access Tokens page).
+- The token was created with the three permissions the same page states for `supabase link` (Project Settings, API Keys, API Key Secrets at Read). `link` therefore succeeded, but without pooler-config access it stored no IPv4 route, and `migration list` fell back to the direct IPv6 host on an IPv4-only network. Conclusion: the documented `link` permission list is incomplete for IPv4-only networks; **Connection Pooling (Read)** is additionally required. This machine confirmed IPv4-only by the error itself.
+
+**Options prepared for the owner (both keep secrets in `.env.local` only):**
+
+1. Preferred: create a new scoped token with Project Settings, API Keys, API Key Secrets **and Connection Pooling**, all Read; `pnpm env:set SUPABASE_ACCESS_TOKEN`; then re-run `link` (approved operation) so the pooler route is stored, then `list-remote`, then `dry-run`.
+2. Fallback without a new token: set `SUPABASE_POOLER_HOST` (the Supavisor host shown in the dashboard's Connect dialog, e.g. `aws-0-<region>.pooler.supabase.com`; not a secret) with `pnpm env:set SUPABASE_POOLER_HOST`. The wrapper then runs `migration list` and `db push --dry-run` with `--db-url` built from the ref, the password and that host over the session-mode port 5432 (the URL is passed to the CLI process only, never printed).
+
+**Verified vs pending:** link verified; project name verified; list-remote and dry-run pending the owner's choice above and a renewed go-ahead; push, bootstrap admin, deploy not approved.
+
+**Security/privacy review:** every CLI output passed through a redaction filter before entering the transcript; nothing matched. `.env.local` unchanged by the CLI; `supabase/.temp` ignored; the stored database password lives in the OS credential store (removable with `pnpm supabase:hosted unlink`).
