@@ -4,19 +4,21 @@
 
 ## 1. Project identity
 
-| Item         | Value                                                                                  |
-| ------------ | -------------------------------------------------------------------------------------- |
-| Project name | `talentflow-ats` (existing project, owner's account)                                   |
-| Project ref  | `zcxmyaxpftzwpzvmhslm`                                                                 |
-| URL          | `https://zcxmyaxpftzwpzvmhslm.supabase.co`                                             |
-| Local config | `.env.local` (git-ignored) holds the URL; the keys are empty until the owner adds them |
+| Item         | Value                                                                                                                                                                                                                                                                                               |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Project name | `talentflow-ats` (existing project, owner's account)                                                                                                                                                                                                                                                |
+| Project ref  | `zcxmyaxpftzwpzvmhslm`                                                                                                                                                                                                                                                                              |
+| URL          | `https://zcxmyaxpftzwpzvmhslm.supabase.co`                                                                                                                                                                                                                                                          |
+| Local config | `.env.local` (git-ignored): URL, project ref and publishable key are set (the key was fetched through the read-only MCP tool and piped into the file without being displayed); the secret key, access token and database password are added by the owner with `pnpm env:set <NAME>` (hidden prompt) |
 
 Keys are read only from `.env.local` or Azure application settings. They are never printed, pasted into chat, logged or committed. `.env.example` documents the names.
 
 ### How the owner completes the local configuration
 
-1. Supabase dashboard → Project Settings → API keys. Copy the **publishable** (or legacy anon) key into `NEXT_PUBLIC_SUPABASE_ANON_KEY` and the **secret** (or legacy service_role) key into `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`.
-2. For hosted migrations later: create a **scoped** personal access token (Account → Access Tokens) limited to this project with database write permission, and put it in `SUPABASE_ACCESS_TOKEN`; put the database password in `SUPABASE_DB_PASSWORD`; set `SUPABASE_PROJECT_REF=zcxmyaxpftzwpzvmhslm`.
+Use `pnpm env:set <NAME>` for every secret: it reads the value at a hidden prompt, writes only `.env.local`, and prints the character count. `pnpm env:check` lists names without values.
+
+1. `SUPABASE_SERVICE_ROLE_KEY` (Project Settings → API keys, secret key): needed only for `pnpm bootstrap:admin`, not for the migration dry-run.
+2. `SUPABASE_ACCESS_TOKEN`: a scoped personal access token with **Project Settings, API Keys and API Key Secrets at Read** (verified requirement of `supabase link`, see `docs/HOSTED_MIGRATION_DRY_RUN.md` §3). `SUPABASE_DB_PASSWORD`: the database password, used by the direct connection of `migration list` and `db push`. The project ref and publishable key are already set.
 
 The Supabase CLI on this machine is not logged in, so no key could be fetched programmatically. That is intentional: a browser login would create a classic full-account token.
 
