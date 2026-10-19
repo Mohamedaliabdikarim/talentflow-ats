@@ -127,7 +127,7 @@ export async function inviteUserAction(
       getPublicEnv().NEXT_PUBLIC_APP_URL,
       link.tokenHash,
       link.linkType,
-      link.existingUser ? "/" : "/auth/set-password",
+      link.existingUser ? "/app" : "/auth/set-password",
     );
     return {
       status: "success",

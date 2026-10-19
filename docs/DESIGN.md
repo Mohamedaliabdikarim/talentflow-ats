@@ -92,3 +92,41 @@ Transforms and opacity only; no width/height animation; animations are interrupt
 ## 7. States to design for every data view
 
 Loading (skeletons that reserve space), empty (explanation + primary action), error (message + retry), permission denied (clear text, no data leak), success (toast, 4 s, non-focus-stealing).
+
+## 8. Public landing page and the dashboard refresh direction (2026-10-19)
+
+### 8.1 Landing page system (`/`)
+
+Input from the design skill: the "Product Demo + Features" landing pattern (hero → product mockup → feature chapters → CTA) and the Aurora/OLED dark-style guidance (deep navy base, luminous gradient accents, 8–14 s drift animations, text contrast ≥ 4.5:1, reduced-motion fallback). Google-font pairings were suggested; Geist stays (ADR-011) with a dedicated display scale.
+
+| Token (`.landing`)                      | Value                                           | Use                                |
+| --------------------------------------- | ----------------------------------------------- | ---------------------------------- |
+| `--background` / `--card` / `--sidebar` | `#070a12` / `#0c1120` / `#0a0f1d`               | page, frames, showcase sidebar     |
+| `--foreground` / `--muted-foreground`   | `#e6eaf2` / `#9aa3b5`                           | text (7.7:1 on the background)     |
+| `--primary` / `--primary-foreground`    | `#6d8cff` / `#070a12`                           | buttons, links, focus ring (6.6:1) |
+| `--accent` / `--accent-foreground`      | `#1b2447` / `#c7d2ff`                           | active states, banner              |
+| gradient text                           | `#8fa7ff → #b08cff`                             | second line of the headline        |
+| glows                                   | `rgba(109,140,255,.35)`, `rgba(139,92,246,.30)` | hero and CTA backdrops             |
+
+Typography: display 48/60/72 px (sm/md/lg), weight 600, tracking −0.035em, line-height 1.02, `text-balance`; section titles 30/36 px tracking −0.025em; body 18–20 px muted; eyebrow 14 px primary with icon. Spacing: 64–96 px section rhythm, 1152 px container, 16/24 px gutters.
+
+Structure: fixed nav (transparent → blurred navy after 8 px scroll; sheet menu below md) · hero (eyebrow, headline, copy, primary "Sign in"/"Open app", secondary "See the product", invitation note) · product showcase (real `AppShell` + `KanbanBoard` with synthetic data, inert) · facts strip (implemented properties only) · three feature chapters with real-component visuals (jobs list, candidate card with `StageBadge`, admin banner + audit rows) · AI Candidate Insights marked "In development" with an illustration labelled as such · CTA · footer.
+
+Motion (within the ADR-009 budget): hero copy stagger (90 ms steps), showcase fade/scale 0.98→1, section reveals on scroll (once), nav backdrop transition, 14 s glow drift. All transform/opacity; all disabled under `prefers-reduced-motion` by the global rule and `MotionConfig`.
+
+Accessibility: landmarks (`header`, `nav`, `main`, `footer`), skip link, visible focus rings on dark, 4.5:1+ text contrast, inert showcase excluded from the tab order and the accessibility tree, axe checks in `tests/e2e/landing.spec.ts`, no horizontal scroll at 375/768/1440 px (screenshot test).
+
+SEO: absolute title "TalentFlow — Hire with clarity. Move talent forward.", description, Open Graph and Twitter card metadata, generated `/opengraph-image` (1200×630) without external assets.
+
+### 8.2 Dashboard refresh direction (proposal, awaiting approval)
+
+The showcase on the landing page _is_ the proposed look of the application in dark mode: the `.landing` tokens are a complete shadcn token set, so applying them as the app's `.dark` theme is a CSS-only change. Proposed, not applied:
+
+1. **Dark theme → navy.** Replace the warm-stone dark tokens with the landing set (surfaces `#070a12/#0c1120`, borders `white/8%`, primary `#6d8cff`). Light theme keeps warm neutrals but moves primary from indigo `#4338ca` to the landing blue `#4f6bff` (contrast on white 5.3:1) for continuity.
+2. **Stat cards.** Add a 2 px gradient top edge (blue → violet) and a leading icon per metric; keep tabular numerals.
+3. **Pipeline columns.** A 3 px stage-tint stripe under each column header (same tints as `StageBadge`) and a softer column background in dark mode.
+4. **Sidebar.** Active item gets a 2 px primary bar on the left plus the accent fill; wordmark uses the gradient tile from the landing.
+5. **Elevation.** 1 px borders + one soft shadow level for frames and dialogs; no stacked shadows.
+6. **Empty states.** Short gradient dot + headline + one action, matching the landing's eyebrow style.
+
+Evidence to review: `docs/screenshots/landing-desktop-1440.png` (hero and showcase) against `docs/screenshots/dashboard-desktop-1440.png` (current light app). On approval the change is one commit (tokens + four small component tweaks) and will be screenshot-verified the same way.

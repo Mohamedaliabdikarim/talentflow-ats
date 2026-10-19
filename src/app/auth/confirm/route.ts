@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = safeRedirectPath(searchParams.get("next"), "/");
+  const next = safeRedirectPath(searchParams.get("next"), "/app");
 
   if (!tokenHash || !type || !ALLOWED_TYPES.has(type)) {
     return NextResponse.redirect(new URL("/login?error=invalid_link", request.url));

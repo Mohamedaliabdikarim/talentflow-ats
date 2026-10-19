@@ -64,7 +64,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (isAuthenticated && pathname === "/login") {
-    return NextResponse.redirect(new URL("/", request.url));
+    return NextResponse.redirect(new URL("/app", request.url));
   }
 
   return response;

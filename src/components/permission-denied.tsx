@@ -18,7 +18,7 @@ export function PermissionDenied() {
         </p>
         <div className="mt-6 flex justify-center gap-3">
           <Button asChild variant="outline">
-            <Link href="/">Go to my workspace</Link>
+            <Link href="/app">Go to my workspace</Link>
           </Button>
           <form action={signOutAction}>
             <Button type="submit" variant="ghost">

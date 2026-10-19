@@ -156,3 +156,25 @@ export function previewSnapshot(filters: PipelineFilters): {
 } {
   return { cards: previewCards(filters), generatedAt: Date.now() };
 }
+
+/** Pristine demo cards (ignores in-memory moves), for the landing page showcase. */
+export function demoCardsSnapshot(): { cards: PipelineCard[]; generatedAt: number } {
+  const cards = PREVIEW_APPLICATIONS.flatMap((application) => {
+    const job = jobById.get(application.job_id);
+    const candidate = candidateById.get(application.candidate_id);
+    if (!job || !candidate) return [];
+    return [
+      {
+        id: application.id,
+        stage: application.stage,
+        stageChangedAt: application.stage_changed_at,
+        jobId: job.id,
+        jobTitle: job.title,
+        candidateId: candidate.id,
+        candidateName: candidate.full_name,
+        candidateHeadline: candidate.headline,
+      },
+    ];
+  }).sort((a, b) => b.stageChangedAt.localeCompare(a.stageChangedAt));
+  return { cards, generatedAt: Date.now() };
+}

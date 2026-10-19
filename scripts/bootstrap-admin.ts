@@ -84,7 +84,7 @@ async function main(): Promise<void> {
 
   console.log(`Platform admin ensured for user ${userId}.`);
   if (tokenHash) {
-    const next = linkType === "invite" ? "/auth/set-password" : "/";
+    const next = linkType === "invite" ? "/auth/set-password" : "/app";
     console.log("One-time link (share privately, expires per project settings):");
     console.log(buildInviteUrl(appUrl, tokenHash, linkType, next));
   }

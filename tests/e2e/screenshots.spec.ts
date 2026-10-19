@@ -15,6 +15,7 @@ const VIEWPORTS = [
   { name: "desktop-1440", width: 1440, height: 900 },
 ];
 const PAGES = [
+  { slug: "landing", path: "/", heading: "Hire with clarity. Move talent forward." },
   { slug: "login", path: "/login?error=expired_link", heading: "Sign in" },
   { slug: "dashboard", path: "/preview/o/northwind", heading: "Northwind Hiring" },
   { slug: "jobs", path: "/preview/o/northwind/jobs", heading: "Jobs" },

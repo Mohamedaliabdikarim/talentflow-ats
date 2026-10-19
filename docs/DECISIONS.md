@@ -313,3 +313,18 @@ Chronological architecture decision records. Statuses: Proposed | Approved | Imp
 - Implementation reference: `src/preview/`, `src/app/preview/`, `src/components/views/`, `src/proxy.ts`.
 - Verification evidence: `tests/unit/preview-enabled.test.ts`, `tests/unit/preview-store.test.ts`, `tests/e2e/preview.spec.ts` (see `docs/DAILY_LOG.md`).
 - Status: Implemented
+
+### ADR-025 — Public landing page at "/", post-login router moved to "/app"
+
+- Date: 2026-10-19
+- Context / problem: The owner wants a premium public marketing homepage (dark navy, electric blue/violet accents, real product showcase, honest content) while keeping the authenticated application and the local preview intact.
+- Options considered: (a) keep "/" as the post-login router and put marketing at "/home"; (b) marketing at "/" and the router at "/app"; (c) separate marketing site.
+- Chosen approach: (b). `/` renders `src/components/landing/*`; signed-in visitors see "Open app" (→ `/app`), signed-out visitors see "Sign in" (→ `/login`). `/app` is the role-based router (protected by the proxy). In-app links, the login redirect, the confirm route's default target and invite links now point at `/app`.
+- Content policy: no testimonials, customer logos, metrics or certifications (none exist); the "facts strip" lists only implemented properties; AI Candidate Insights is labelled "In development" and shown as an illustration; onboarding is described as invitation-based because that is the real flow.
+- Showcase: the real `AppShell` + `KanbanBoard` rendered with synthetic data inside an `inert`, `aria-hidden` frame, so the mockup is the product, not a drawing. The `.landing` token set (navy surfaces, electric blue primary) drives shadcn components inside the landing and doubles as the proposed application dark theme (`docs/DESIGN.md` §8).
+- Why this approach: One codebase and theme system, a truthful product picture, and the landing palette becomes a concrete, reviewable direction for the app rather than a separate brand.
+- Trade-offs / risks: `/` reads the session cookie to switch CTAs, so it renders dynamically (fine on App Service); the showcase ships the board's client bundle on the landing page. Typography stays Geist (self-hosted) instead of the design skill's Google Fonts suggestions, consistent with ADR-011.
+- Security and privacy implications: no new data access; the showcase is inert (no focusable elements, no actions); OG image is generated without external assets.
+- Implementation reference: `src/app/page.tsx`, `src/app/app/page.tsx`, `src/app/opengraph-image.tsx`, `src/components/landing/*`, `.landing` block in `src/app/globals.css`.
+- Verification evidence: `tests/e2e/landing.spec.ts` (hero, CTAs, nav, inert showcase, `/app` redirect, axe), screenshots at 375/768/1440 px (`docs/screenshots/landing-*.png`); see `docs/DAILY_LOG.md`.
+- Status: Implemented (local); owner's visual review pending

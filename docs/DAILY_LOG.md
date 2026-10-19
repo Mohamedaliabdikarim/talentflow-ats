@@ -362,3 +362,32 @@ Reading: exactly the three committed migrations, in timestamp order; `seeds: []`
 **Security/privacy review:** preview is unreachable in production unless `TALENTFLOW_PREVIEW=1` (unit-tested; documented in `docs/SECURITY.md` and `docs/DEPLOYMENT.md`); no Supabase calls from preview code; synthetic data only.
 
 **Verified vs pending:** preview and the two fixes verified locally and by E2E; owner's visual feedback pending; hosted push, bootstrap admin, deployment not approved and not run.
+
+## 2026-10-19 (continued) — Public landing page at "/" and dashboard refresh proposal
+
+**Request:** a premium public marketing homepage at "/", keeping the app and the preview; propose (not apply) dashboard improvements; lint, typecheck, build, browser tests, screenshots; wait for visual feedback.
+
+**Work completed (verified):**
+
+- `/` is now the landing page (ADR-025); the post-login router moved to `/app`; the login redirect, in-app wordmark link, permission-denied link, confirm-route default and invite links point at `/app`. The proxy keeps `/app` behind authentication (verified: 307 to `/login?next=%2Fapp`).
+- Landing (`src/components/landing/*`): fixed nav with scroll backdrop and sheet menu, hero with the requested headline, real-product showcase (`AppShell` + `KanbanBoard`, synthetic data, `inert` and `aria-hidden`), facts strip of implemented properties only, three feature chapters with real-component visuals, AI Candidate Insights marked "In development" with an illustration labelled as such, CTA, footer. No testimonials, logos, metrics or certifications. CTAs: "Sign in"/"Get started" → `/login`; "Open app" → `/app` for signed-in visitors.
+- Design system: `.landing` token set (navy surfaces, electric blue primary, violet glow) in `src/app/globals.css`, documented in `docs/DESIGN.md` §8.1 with contrast figures; the same tokens are the proposed application dark theme (§8.2), not applied.
+- SEO: absolute title, description, Open Graph/Twitter metadata, generated `/opengraph-image` (1200×630).
+- Motion: hero stagger, showcase scale-in, scroll reveals (once), 14 s glow drift; transform/opacity only; disabled under reduced motion.
+- Tests: `tests/e2e/landing.spec.ts` (hero and honest copy, CTAs, section navigation incl. mobile sheet, inert showcase with no focusable element in the tab order, `/app` redirect, axe WCAG 2.x A/AA); landing added to the screenshot pages.
+- One defect found and fixed during the build: a constant exported from a `"use client"` module was imported by a Server Component (it arrives as a client reference, not data); moved to a plain data module.
+
+**Tests run and exact results:**
+
+| Command                               | Result                                                                                 |
+| ------------------------------------- | -------------------------------------------------------------------------------------- |
+| `pnpm lint` / `pnpm typecheck`        | Pass                                                                                   |
+| `pnpm test`                           | 99 passed / 99                                                                         |
+| `pnpm build`                          | Pass                                                                                   |
+| `pnpm test:e2e`                       | 45 passed (55 skipped: opt-in screenshots and single-project tests); chromium + mobile |
+| `SCREENSHOTS=1 … screenshots.spec.ts` | 27 passed; 9 pages × 3 breakpoints, no horizontal overflow                             |
+| Dev server (port 3100)                | `/` 200, `/app` 307 → login, preview routes 200                                        |
+
+**Review URL:** http://localhost:3100/ (landing), http://localhost:3100/preview (app preview). Visual feedback pending.
+
+**Verified vs pending:** landing implemented and tested locally; dashboard refresh is a documented proposal (`docs/DESIGN.md` §8.2) awaiting the owner's direction; hosted push, bootstrap admin, deployment not approved and not run.

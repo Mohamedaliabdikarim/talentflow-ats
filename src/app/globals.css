@@ -123,6 +123,62 @@
   --sidebar-ring: #818cf8;
 }
 
+/*
+ * Public landing page: always dark, navy surfaces with an electric blue / violet accent.
+ * The same token names drive shadcn components, so the product showcase embedded in the
+ * landing renders the real UI in this palette. This block is also the proposed dark
+ * theme for the application (docs/DESIGN.md §8), pending the owner's approval.
+ */
+.landing {
+  color-scheme: dark;
+  --background: #070a12;
+  --foreground: #e6eaf2;
+  --card: #0c1120;
+  --card-foreground: #e6eaf2;
+  --popover: #0c1120;
+  --popover-foreground: #e6eaf2;
+  --primary: #6d8cff;
+  --primary-foreground: #070a12;
+  --secondary: #121930;
+  --secondary-foreground: #e6eaf2;
+  --muted: #121930;
+  --muted-foreground: #9aa3b5;
+  --accent: #1b2447;
+  --accent-foreground: #c7d2ff;
+  --destructive: #f87171;
+  --border: #ffffff14;
+  --input: #ffffff1f;
+  --ring: #6d8cff;
+  --sidebar: #0a0f1d;
+  --sidebar-foreground: #e6eaf2;
+  --sidebar-primary: #6d8cff;
+  --sidebar-primary-foreground: #070a12;
+  --sidebar-accent: #1b2447;
+  --sidebar-accent-foreground: #c7d2ff;
+  --sidebar-border: #ffffff14;
+  --sidebar-ring: #6d8cff;
+  --landing-glow-blue: rgba(109, 140, 255, 0.35);
+  --landing-glow-violet: rgba(139, 92, 246, 0.3);
+}
+
+/* Slow drift for the hero glow (docs/DESIGN.md §7: 12 s loop, disabled by the reduced-motion rule below). */
+@keyframes landing-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(3%, -4%, 0) scale(1.06);
+  }
+}
+
+.landing-gradient-text {
+  background: linear-gradient(135deg, #8fa7ff 0%, #b08cff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

@@ -1,5 +1,5 @@
 /**
- * Decides where a signed-in user lands after login or when opening "/".
+ * Decides where a signed-in user lands after login or when opening "/app".
  * Pure so it can be unit-tested without a database.
  */
 export type LandingInput = {

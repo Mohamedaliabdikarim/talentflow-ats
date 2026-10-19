@@ -46,10 +46,10 @@ Hosted operations are explicit and approval-gated: `pnpm supabase:hosted <link|l
 ## Repository layout
 
 ```
-src/app            routes: login, auth/confirm, auth/set-password, admin/*, o/[orgSlug]/*, api/health
+src/app            routes: / (public landing), app (post-login router), login, auth/*, admin/*, o/[orgSlug]/*, preview/*, api/health
 src/proxy.ts       session refresh + optimistic auth redirects (Next.js 16 "proxy")
 src/lib            env validation, Supabase clients (typed), Zod schemas, invite links, motion tokens
-src/components     ui/ (shadcn primitives), app shell, forms, providers
+src/components     ui/ (shadcn primitives), views/ (shared page bodies), landing/, app shell, forms, providers
 src/server         auth guards, audit, data access, Server Actions
 supabase/          SQL migrations — the only way the schema changes
 scripts/db         local auth shim, embedded cluster helpers, type generator, hosted CLI wrapper

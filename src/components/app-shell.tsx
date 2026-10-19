@@ -36,7 +36,7 @@ export function AppShell({
     <div className="flex min-h-full flex-1">
       <aside className="hidden w-60 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground md:flex">
         <div className="px-4 py-4">
-          <Link href="/" className="text-base font-semibold tracking-tight">
+          <Link href="/app" className="text-base font-semibold tracking-tight">
             TalentFlow
           </Link>
           <p className="mt-1 truncate text-sm font-medium">{title}</p>
