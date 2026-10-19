@@ -3,8 +3,9 @@
 import { ArrowRightLeft } from "lucide-react";
 import Link from "next/link";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
-import { useOptimistic, useState, useTransition } from "react";
+import { useCallback, useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
+import { cn } from "cn";
 import { stageIcon } from "@/components/stage-badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,11 +34,31 @@ type KanbanBoardProps = {
   now: number;
 };
 
+const STAGE_SET = new Set<string>(APPLICATION_STAGES);
+
 /**
- * Compact Kanban (ADR-014). Moving a card is a menu action (keyboard and screen-reader
- * friendly) that updates optimistically and persists through a Server Action; the change
- * is announced in a live region. Pointer drag-and-drop is a Phase 3 enhancement on top of
- * the same action. Card movement between columns animates through Motion's shared layout.
+ * Finds the stage column under a pointer position, ignoring the card being dragged
+ * (it sits on top of the stack and belongs to its original column).
+ */
+function stageAtPoint(event: MouseEvent | TouchEvent | PointerEvent): ApplicationStage | null {
+  if (typeof document === "undefined" || !("elementsFromPoint" in document)) return null;
+  const point = "changedTouches" in event ? event.changedTouches[0] : event;
+  if (!point) return null;
+  for (const element of document.elementsFromPoint(point.clientX, point.clientY)) {
+    if (element.closest("[data-dragging='true']")) continue;
+    const column = element.closest<HTMLElement>("[data-stage]");
+    const stage = column?.dataset.stage;
+    if (stage && STAGE_SET.has(stage)) return stage as ApplicationStage;
+  }
+  return null;
+}
+
+/**
+ * Compact Kanban (ADR-014, ADR-021). Two ways to move a card, both ending in the same
+ * Server Action with an optimistic update and a live-region announcement:
+ *  - the per-card "Move to stage" menu (keyboard and screen-reader path), and
+ *  - pointer drag onto another column (Phase 3 enhancement; columns highlight on hover).
+ * Card movement between columns animates through Motion's shared layout.
  */
 export function KanbanBoard({ orgSlug, cards, now }: KanbanBoardProps) {
   const [optimisticCards, applyMove] = useOptimistic(cards, (state: PipelineCard[], move: Move) =>
@@ -49,26 +70,34 @@ export function KanbanBoard({ orgSlug, cards, now }: KanbanBoardProps) {
   );
   const [, startTransition] = useTransition();
   const [announcement, setAnnouncement] = useState("");
+  const [dropTarget, setDropTarget] = useState<ApplicationStage | null>(null);
   const groups = groupByStage(optimisticCards);
 
-  function move(card: PipelineCard, stage: ApplicationStage) {
-    if (card.stage === stage) return;
-    startTransition(async () => {
-      applyMove({ id: card.id, stage });
-      const result = await moveApplicationStageAction(orgSlug, {
-        applicationId: card.id,
-        stage,
+  const move = useCallback(
+    (card: PipelineCard, stage: ApplicationStage) => {
+      if (card.stage === stage) return;
+      startTransition(async () => {
+        applyMove({ id: card.id, stage });
+        const result = await moveApplicationStageAction(orgSlug, {
+          applicationId: card.id,
+          stage,
+        });
+        if (result.status === "error") {
+          setAnnouncement(`Could not move ${card.candidateName}: ${result.message}`);
+          toast.error(result.message);
+          return;
+        }
+        const text = `Moved ${card.candidateName} to ${STAGE_LABELS[stage]}`;
+        setAnnouncement(text);
+        toast.success(text);
       });
-      if (result.status === "error") {
-        setAnnouncement(`Could not move ${card.candidateName}: ${result.message}`);
-        toast.error(result.message);
-        return;
-      }
-      const text = `Moved ${card.candidateName} to ${STAGE_LABELS[stage]}`;
-      setAnnouncement(text);
-      toast.success(text);
-    });
-  }
+    },
+    [applyMove, orgSlug],
+  );
+
+  const handleDragOver = useCallback((stage: ApplicationStage | null) => {
+    setDropTarget((current) => (current === stage ? current : stage));
+  }, []);
 
   return (
     <LayoutGroup>
@@ -85,7 +114,11 @@ export function KanbanBoard({ orgSlug, cards, now }: KanbanBoardProps) {
                 key={stage}
                 role="listitem"
                 aria-labelledby={`stage-${stage}`}
-                className="flex w-64 shrink-0 flex-col rounded-lg border bg-muted/40"
+                data-stage={stage}
+                className={cn(
+                  "flex w-64 shrink-0 flex-col rounded-lg border bg-muted/40 transition-colors duration-150 sm:w-72",
+                  dropTarget === stage && "border-primary bg-accent/60",
+                )}
               >
                 <header className="flex items-center gap-2 px-3 py-2">
                   <Icon className="size-4 text-muted-foreground" aria-hidden="true" />
@@ -108,6 +141,7 @@ export function KanbanBoard({ orgSlug, cards, now }: KanbanBoardProps) {
                         orgSlug={orgSlug}
                         now={now}
                         onMove={move}
+                        onDragOver={handleDragOver}
                       />
                     ))}
                   </AnimatePresence>
@@ -131,22 +165,44 @@ function KanbanCard({
   orgSlug,
   now,
   onMove,
+  onDragOver,
 }: {
   card: PipelineCard;
   orgSlug: string;
   now: number;
   onMove: (card: PipelineCard, stage: ApplicationStage) => void;
+  onDragOver: (stage: ApplicationStage | null) => void;
 }) {
+  const [dragging, setDragging] = useState(false);
   const age = formatStageAge(daysInStage(card.stageChangedAt, now));
+
   return (
     <motion.li
       layout
       layoutId={card.id}
+      data-card-id={card.id}
+      data-dragging={dragging ? "true" : undefined}
+      drag
+      dragSnapToOrigin
+      dragMomentum={false}
+      dragElastic={0.15}
+      whileDrag={{ scale: 1.03, zIndex: 20 }}
+      onDragStart={() => setDragging(true)}
+      onDrag={(event) => onDragOver(stageAtPoint(event))}
+      onDragEnd={(event) => {
+        const target = stageAtPoint(event);
+        setDragging(false);
+        onDragOver(null);
+        if (target && target !== card.stage) onMove(card, target);
+      }}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, transition: exitTransition }}
       transition={{ ...enterTransition, layout: cardSpring }}
-      className="rounded-md border bg-card p-3 shadow-xs"
+      className={cn(
+        "cursor-grab touch-pan-y rounded-md border bg-card p-3 shadow-xs active:cursor-grabbing",
+        dragging && "shadow-lg",
+      )}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">

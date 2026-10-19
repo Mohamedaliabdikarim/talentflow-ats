@@ -71,7 +71,7 @@ Where motion is used and why:
 
 1. **Page content entrance:** fade + 8 px rise, 200 ms, stagger 30 ms for list rows — orientation after navigation.
 2. **Dialogs and sheets:** scale 0.98→1 + fade — spatial origin of the modal.
-3. **Kanban card move:** `layout` animation across columns + `AnimatePresence` for add/remove — shows where a card went.
+3. **Kanban card move:** `layout` animation across columns + `AnimatePresence` for add/remove — shows where a card went. Pointer drag (`drag`, `dragSnapToOrigin`, `whileDrag` scale 1.03) highlights the hovered column; the menu remains the keyboard path.
 4. **Stage badge change:** 150 ms crossfade — confirms the state change.
 5. **Nothing else.** No parallax, no decorative loops, no animated backgrounds.
 

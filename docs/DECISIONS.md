@@ -207,8 +207,8 @@ Chronological architecture decision records. Statuses: Proposed | Approved | Imp
 - Trade-offs / risks: Tools are unavailable in non-interactive sessions until approved; read-only means migrations go through the CLI, which is the intended separation.
 - Security and privacy implications: Read-only; project-scoped; the agent cannot mutate the hosted project through MCP.
 - Implementation reference: `.mcp.json`, `docs/SUPABASE_INTEGRATION.md` §2.
-- Verification evidence: `claude mcp list` shows the server pending approval; connectivity test pending the owner's OAuth.
-- Status: Implemented (configuration) / Verification pending
+- Verification evidence: 2026-10-19 after OAuth: `claude mcp list` → Connected; `get_project_url`, `list_tables` (public: none), `list_migrations` (none) via a headless read-only session (`docs/DAILY_LOG.md`).
+- Status: Verified (read-only)
 
 ### ADR-017 — Official Supabase agent skills installed in the repository
 
@@ -273,7 +273,7 @@ Chronological architecture decision records. Statuses: Proposed | Approved | Imp
 - Security and privacy implications: Stage is validated against the enum server-side; the update is filtered by the URL organization and by RLS.
 - Implementation reference: `src/components/kanban/kanban-board.tsx`, `src/server/actions/applications.ts`.
 - Verification evidence: unit tests (`tests/unit/workspace-actions.test.ts`), DB tests (`tests/db/pipeline.test.ts` "stage moves"); browser verification against the hosted project pending.
-- Status: Implemented (local)
+- Status: Implemented (local); pointer drag added 2026-10-19 on top of the same action (`tests/unit/kanban-board.test.tsx`)
 
 ### ADR-022 — Pipeline filters live in the URL and are applied in the database
 

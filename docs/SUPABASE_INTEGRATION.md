@@ -1,6 +1,6 @@
 # TalentFlow ATS — Supabase Integration
 
-**Status (2026-10-19):** Hosted project identified and configured locally; MCP server registered (read-only, awaiting the owner's OAuth); migrations verified locally only. **Nothing has been applied to the hosted project.** Applying requires the owner's explicit approval of the plan in §6.
+**Status (2026-10-19, updated):** Hosted project identified; MCP server connected read-only and verified; local CLI config created (`supabase/config.toml`, `supabase init`); migrations verified locally only; dry-run plan in `docs/HOSTED_MIGRATION_DRY_RUN.md`. **Nothing has been applied to the hosted project.** Applying requires the owner's explicit approval of the plan in §6.
 
 ## 1. Project identity
 
@@ -37,7 +37,7 @@ Result: `.mcp.json` at the repository root (committed; it contains no secrets). 
 3. Type `/mcp`, select `supabase`, choose **Authenticate**. A browser window opens on supabase.com; sign in and approve access for the organization that owns `talentflow-ats`.
 4. Back in the terminal the server shows as connected. Start a new session (or `/mcp` → reconnect) so the tools load.
 
-**Verification planned (non-destructive, first session after auth):** `list_tables` on the `public` schema (expected: empty, because no migrations have been applied) and `get_project_url`. The read-only flag is kept until the owner decides otherwise; the MCP server is **not** the mechanism for applying migrations.
+**Verification (2026-10-19, after the owner completed OAuth):** `claude mcp list` → `✔ Connected`. Read-only calls made through a headless `claude -p` session restricted to those tools: `get_project_url` → `{"url":"https://zcxmyaxpftzwpzvmhslm.supabase.co"}`; `list_tables` (schema `public`) → `{"tables":[]}`; `list_migrations` → `{"migrations":[]}`. The project-scoped server exposes 13 tools and no project-name lookup (`get_project`/`list_projects` are account-level and absent), so the display name `talentflow-ats` is confirmed by the owner's instruction and the matching ref/URL, not by MCP. The read-only flag stays; the MCP server is **not** the mechanism for applying migrations.
 
 ## 3. Supabase agent skills
 

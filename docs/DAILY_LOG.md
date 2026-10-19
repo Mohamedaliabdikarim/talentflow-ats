@@ -176,3 +176,53 @@ Not run: Playwright E2E (needs browsers and, for authenticated flows, a hosted S
 
 1. Owner: complete MCP OAuth; approve the hosted migration dry-run (`docs/SUPABASE_INTEGRATION.md` §6), then the push and the bootstrap admin.
 2. Phase 3: pointer drag on the board, responsive polish, Playwright flows with real accounts once the hosted project is ready, accessibility review.
+
+## 2026-10-19 (continued) — MCP verification, dry-run plan, Phase 3 start
+
+**Goal:** Verify the Supabase MCP connection read-only after the owner's OAuth, confirm the project, prepare the exact hosted migration dry-run plan, and continue Phase 3 locally (pointer drag on the board, accessibility checks, component tests).
+
+**Work completed (verified):**
+
+- **MCP connection verified (read-only).** `claude mcp list` → `supabase … ✔ Connected`. Because this session started before the server existed, the calls were made through a headless `claude -p` session whose `--allowedTools` contained only the read-only tools. Raw results:
+  - `get_project_url` → `{"url":"https://zcxmyaxpftzwpzvmhslm.supabase.co"}` (matches the owner's project ref).
+  - `list_tables` (schemas `["public"]`) → `{"tables":[]}`.
+  - `list_migrations` → `{"migrations":[]}`.
+  - Tools exposed by the project-scoped server (13): `execute_sql`, `generate_typescript_types`, `get_advisors`, `get_edge_function`, `get_project_url`, `get_publishable_keys`, `list_branches`, `list_edge_functions`, `list_extensions`, `list_migrations`, `list_tables`, `query_logs`, `search_docs`. No account-level tool (`get_project`, `list_projects`) is exposed, so the display name `talentflow-ats` is confirmed by the owner's statement plus the matching ref and URL, not by an MCP call. No mutating tool was called; `read_only=true` remains in `.mcp.json`.
+- **Hosted migration dry-run plan** written to `docs/HOSTED_MIGRATION_DRY_RUN.md` (target, verified empty state, files, credentials and handling, exact commands with expected output, failure handling, approval checklist). `supabase init` created `supabase/config.toml` locally (project id `talentflow-ats`, PostgreSQL 17); `scripts/db/hosted.mjs` now passes `--linked` explicitly and gained `unlink`.
+- **Phase 3 (local):** pointer drag-and-drop on the Kanban (Motion `drag`, drop target detected with `elementsFromPoint`, column highlight, same Server Action and live region as the menu path); axe-core accessibility checks added to the E2E suite for the public pages; `KanbanBoard` component tests (jsdom) covering column rendering, the keyboard move path with optimistic placement and announcement, and the revert on failure.
+
+**Files/commits:** Phase 3a commit on `main` (see `git log --oneline`).
+
+**AI tools/skills used and why:** headless `claude -p` with an explicit tool allow-list for the MCP verification (the only way to call MCP tools from a session that predates the server); `@axe-core/playwright` for WCAG 2.x A/AA rules; Testing Library + user-event for the board test.
+
+**Human decisions and reasoning:** Owner completed MCP OAuth; asked for read-only verification, journal entry, exact dry-run plan, and continued local Phase 3 work; no hosted changes.
+
+**Tests run and exact results:**
+
+| Command                        | Result                                                              |
+| ------------------------------ | ------------------------------------------------------------------- |
+| `pnpm lint` / `pnpm typecheck` | Pass                                                                |
+| `pnpm test`                    | 92 passed / 92 in 7 files (adds `tests/unit/kanban-board.test.tsx`) |
+| `pnpm build`                   | Pass                                                                |
+| `pnpm test:e2e`                | 14 passed / 14: 10 smoke + 4 axe (chromium + mobile), 23.1 s        |
+| `pnpm db:verify`               | unchanged since the Phase 2 run (31 passed); re-run by CI           |
+| GitHub Actions (this push)     | Recorded below                                                      |
+
+**Security/privacy review:**
+
+- MCP: read-only flag kept; the headless verification session was restricted to read-only tools by allow-list; no SQL executed.
+- Credentials for the dry-run stay in `.env.local` and the OS credential store (written by `supabase link`); the plan recommends a scoped, short-lived token and revocation after the push.
+- Drag-and-drop reuses the validated Server Action (stage enum, organization pinning, RLS); the menu path remains for keyboard and assistive technology.
+
+**Issues, risks, and compromises:**
+
+- The MCP server cannot return the project's display name; confirmation of the name relies on the owner and the ref match.
+- `execute_sql` is exposed even in read-only mode; the server enforces read-only semantics, and this project does not use it.
+- `supabase/config.toml` carries local-dev auth defaults (signup enabled, 6-character passwords) that only apply to a local `supabase start` stack; hosted settings are set in the dashboard (see the plan's step 7 in `docs/SUPABASE_INTEGRATION.md`).
+- Drag-and-drop has component coverage for the shared move logic but no browser verification until the hosted project provides test accounts.
+
+**Next actions:**
+
+1. Owner: review `docs/HOSTED_MIGRATION_DRY_RUN.md`, add the three variables to `.env.local`, approve steps 1–3.
+2. After the dry-run: separate approval for `push`, then advisors, type diff, bootstrap admin, hosted invite-flow E2E.
+3. Phase 3 continued: responsive review at 375/768/1024/1440 px, screenshots and authenticated E2E once accounts exist.

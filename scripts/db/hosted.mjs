@@ -15,9 +15,10 @@ const [command] = process.argv.slice(2);
 
 const commands = {
   link: ["link", "--project-ref", ref ?? ""],
-  "list-remote": ["migration", "list"],
-  "dry-run": ["db", "push", "--dry-run"],
-  push: ["db", "push"],
+  "list-remote": ["migration", "list", "--linked"],
+  "dry-run": ["db", "push", "--dry-run", "--linked"],
+  push: ["db", "push", "--linked"],
+  unlink: ["unlink"],
 };
 
 function fail(message) {
