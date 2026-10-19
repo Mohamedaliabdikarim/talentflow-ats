@@ -36,6 +36,10 @@ export default async function LandingPage() {
 
   return (
     <div className="landing dark flex min-h-full flex-1 flex-col bg-background text-foreground">
+      <noscript>
+        {/* Motion server-renders animated blocks hidden; without JavaScript show them as-is. */}
+        <style>{`[data-reveal]{opacity:1!important;transform:none!important}`}</style>
+      </noscript>
       <LandingNav signedIn={signedIn} />
       <main id="main" className="flex-1">
         <Hero signedIn={signedIn} />

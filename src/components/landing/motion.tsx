@@ -6,6 +6,10 @@ import { enterTransition, motionTokens } from "@/lib/motion";
 /**
  * Landing-page motion (docs/DESIGN.md §5): entrance and scroll-reveal only, transform and
  * opacity only, honoured by the global MotionConfig reducedMotion="user".
+ *
+ * Every animated wrapper carries data-reveal so the <noscript> rule in the landing page
+ * can force it visible when JavaScript is unavailable (Motion server-renders the hidden
+ * initial state otherwise).
  */
 
 const container: Variants = {
@@ -41,7 +45,7 @@ export function HeroItem({
   className?: string;
 }) {
   return (
-    <motion.div className={className} variants={item}>
+    <motion.div data-reveal className={className} variants={item}>
       {children}
     </motion.div>
   );
@@ -62,10 +66,11 @@ export function Reveal({
 }) {
   return (
     <motion.div
+      data-reveal
       className={className}
       initial={{ opacity: 0, y: 18, scale: scale ? 0.98 : 1 }}
       whileInView={{ opacity: 1, y: 0, scale: 1 }}
-      viewport={{ once: true, margin: "0px 0px -10% 0px" }}
+      viewport={{ once: true, amount: 0.15 }}
       transition={{ ...enterTransition, duration: 0.5, delay }}
     >
       {children}

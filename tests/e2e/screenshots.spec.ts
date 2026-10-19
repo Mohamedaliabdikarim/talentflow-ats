@@ -45,6 +45,16 @@ test.describe("reference screenshots", () => {
         await page.setViewportSize({ width: viewport.width, height: viewport.height });
         await page.goto(target.path);
         await expect(page.getByRole("heading", { name: target.heading }).first()).toBeVisible();
+        // Scroll through the page so scroll-triggered reveals have run before the capture.
+        await page.evaluate(async () => {
+          const step = Math.max(400, window.innerHeight * 0.8);
+          for (let y = 0; y < document.body.scrollHeight; y += step) {
+            window.scrollTo(0, y);
+            await new Promise((resolve) => setTimeout(resolve, 60));
+          }
+          window.scrollTo(0, 0);
+        });
+        await page.waitForTimeout(700);
         // No horizontal page scroll at any breakpoint (docs/DESIGN.md §3).
         const overflow = await page.evaluate(
           () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
