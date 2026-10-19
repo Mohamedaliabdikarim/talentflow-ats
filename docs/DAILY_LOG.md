@@ -94,16 +94,16 @@ Not run: Playwright E2E (needs browsers and, for authenticated flows, a hosted S
 
 **Tests run and exact results:**
 
-| Command                               | Result                                                                                  |
-| ------------------------------------- | --------------------------------------------------------------------------------------- |
-| `pnpm lint`                           | Pass                                                                                    |
-| `pnpm typecheck`                      | Pass                                                                                    |
-| `pnpm test`                           | 74 passed / 74 in 4 files                                                               |
-| `pnpm db:verify`                      | 25 passed / 25 (3 migrations applied); repeated once to confirm file-order independence |
-| `pnpm build`                          | Pass; 15 routes, all dynamic except `/_not-found`                                       |
-| `pnpm test:e2e`                       | 10 passed / 10 (chromium + mobile), 14.7 s                                              |
-| GitHub Actions run #1                 | Failed: `LayoutProps` not found on clean checkout → fixed                               |
-| GitHub Actions after the Phase 1 push | Result recorded below once available                                                    |
+| Command                                                          | Result                                                                                                                         |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm lint`                                                      | Pass                                                                                                                           |
+| `pnpm typecheck`                                                 | Pass                                                                                                                           |
+| `pnpm test`                                                      | 74 passed / 74 in 4 files                                                                                                      |
+| `pnpm db:verify`                                                 | 25 passed / 25 (3 migrations applied); repeated once to confirm file-order independence                                        |
+| `pnpm build`                                                     | Pass; 15 routes, all dynamic except `/_not-found`                                                                              |
+| `pnpm test:e2e`                                                  | 10 passed / 10 (chromium + mobile), 14.7 s                                                                                     |
+| GitHub Actions run #1                                            | Failed: `LayoutProps` not found on clean checkout → fixed                                                                      |
+| GitHub Actions run 39292371082 (commit `02980df`, ubuntu-latest) | Success in 1m31s: lint, typecheck, unit, db:verify (embedded PostgreSQL on Linux), build, bundle grep, Playwright install, E2E |
 
 **Security/privacy review:**
 

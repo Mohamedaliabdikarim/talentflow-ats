@@ -58,16 +58,16 @@ Evidence rule (spec §10): a test is marked **Verified** only with the command, 
 
 ### 2026-10-19 — Phase 1 local verification (same machine)
 
-| Command                                   | Result                                      | Notes                                                                       |
-| ----------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------- |
-| `pnpm lint`                               | Pass                                        |                                                                             |
-| `pnpm typecheck`                          | Pass                                        | Typed Supabase client across the data layer                                 |
-| `pnpm test`                               | 74 passed / 74 (4 files)                    | validation, invite/landing, auth guards, admin actions                      |
-| `pnpm db:verify` (run twice)              | 25 passed / 25 both runs                    | 3 migrations applied; order independence confirmed after scoping assertions |
-| `pnpm build`                              | Pass                                        | 15 routes, all dynamic except `/_not-found`; proxy registered               |
-| `pnpm test:e2e`                           | 10 passed / 10 (5 tests × chromium, mobile) | Against `pnpm start` with placeholder public env; 14.7 s                    |
-| GitHub Actions run #1 (commit `1a52dca`)  | Failed at `pnpm typecheck`                  | `LayoutProps` global absent on a clean checkout; fixed (explicit prop type) |
-| GitHub Actions run after the Phase 1 push | See `docs/DAILY_LOG.md`                     |                                                                             |
+| Command                                           | Result                                      | Notes                                                                          |
+| ------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------ |
+| `pnpm lint`                                       | Pass                                        |                                                                                |
+| `pnpm typecheck`                                  | Pass                                        | Typed Supabase client across the data layer                                    |
+| `pnpm test`                                       | 74 passed / 74 (4 files)                    | validation, invite/landing, auth guards, admin actions                         |
+| `pnpm db:verify` (run twice)                      | 25 passed / 25 both runs                    | 3 migrations applied; order independence confirmed after scoping assertions    |
+| `pnpm build`                                      | Pass                                        | 15 routes, all dynamic except `/_not-found`; proxy registered                  |
+| `pnpm test:e2e`                                   | 10 passed / 10 (5 tests × chromium, mobile) | Against `pnpm start` with placeholder public env; 14.7 s                       |
+| GitHub Actions run #1 (commit `1a52dca`)          | Failed at `pnpm typecheck`                  | `LayoutProps` global absent on a clean checkout; fixed (explicit prop type)    |
+| GitHub Actions run 39292371082 (commit `02980df`) | Success, 1m31s                              | Clean Ubuntu checkout: all steps green, including db:verify and Playwright E2E |
 
 Unit count note: 73 before and 74 after the pending-invite refinement in `inviteUserAction`.
 
