@@ -1,0 +1,46 @@
+# Continuous integration: lint, type-check, unit tests, migration + RLS tests on an
+# embedded PostgreSQL, production build, and a guard that the service-role key name
+# never appears in client bundles. Deployment is a separate, approval-gated workflow.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.17.1
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+
+      - run: pnpm typecheck
+
+      - run: pnpm test
+
+      - run: pnpm db:verify
+
+      - run: pnpm build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
+
+      - name: Service-role key name must not reach client bundles
+        run: |
+          if grep -r "SUPABASE_SERVICE_ROLE_KEY" .next/static; then
+            echo "Server-only environment variable referenced from a client bundle"
+            exit 1
+          fi
