@@ -128,14 +128,14 @@ Unit count note: 73 before and 74 after the pending-invite refinement in `invite
 
 ### 2026-10-19 — Local preview and visual verification (same machine)
 
-| Command                               | Result                      | Notes                                           |
-| ------------------------------------- | --------------------------- | ----------------------------------------------- |
-| `pnpm test`                           | 99 passed / 99 (9 files)    | adds preview store and gate tests               |
-| `pnpm build`                          | Pass                        | preview routes dynamic                          |
-| `pnpm test:e2e`                       | 35 passed (49 skipped)      | smoke + axe + preview pages, chromium + mobile  |
-| `SCREENSHOTS=1 … screenshots.spec.ts` | 24 passed                   | 8 pages × 3 breakpoints, no horizontal overflow |
-| Dev server `pnpm dev -p 3100`         | all preview routes HTTP 200 | owner visual review pending                     |
-| GitHub Actions (preview push)         | See `docs/DAILY_LOG.md`     |                                                 |
+| Command                               | Result                      | Notes                                                                                                       |
+| ------------------------------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `pnpm test`                           | 99 passed / 99 (9 files)    | adds preview store and gate tests                                                                           |
+| `pnpm build`                          | Pass                        | preview routes dynamic                                                                                      |
+| `pnpm test:e2e`                       | 35 passed (49 skipped)      | smoke + axe + preview pages, chromium + mobile                                                              |
+| `SCREENSHOTS=1 … screenshots.spec.ts` | 24 passed                   | 8 pages × 3 breakpoints, no horizontal overflow                                                             |
+| Dev server `pnpm dev -p 3100`         | all preview routes HTTP 200 | owner visual review pending                                                                                 |
+| GitHub Actions run (commit `7d28814`) | Success, 2m8s               | clean Ubuntu checkout: lint, typecheck, unit 99, db:verify 31, build, bundle grep, Playwright incl. preview |
 
 ### Not yet executed
 
