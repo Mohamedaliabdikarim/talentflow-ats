@@ -1,0 +1,7 @@
+# Normalize to LF so the repository is identical on Windows, Linux CI and Azure.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
