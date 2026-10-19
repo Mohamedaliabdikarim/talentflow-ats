@@ -51,3 +51,5 @@ See `docs/DAILY_LOG.md` for the dated record.
 - `FormData.get()` returns `null` for absent fields; the Zod normaliser only handled empty strings. Caught by the admin-action unit tests, fixed in `emptyToUndefined()` and covered by a new validation test.
 - A database assertion read every organization, so a second test file's seed data leaked in depending on execution order (one run green, one red). Assertions are now scoped to the file's own ids; the suite was run twice to confirm order independence.
 - An enum `order by` assumed alphabetical order; PostgreSQL orders enums by definition order. Fixed with a `::text` cast in the test.
+
+**Corrections during the landing-page work:** a constant exported from a `"use client"` module was imported into a Server Component and arrived as a client reference (runtime error); moved to a plain data module. Scroll-reveal animations server-rendered their hidden state, which blanked sections in full-page captures and for no-JavaScript visitors; fixed with a `<noscript>` fallback. The accessibility test sampled colours mid-animation on CI; fixed by waiting for animations to settle.

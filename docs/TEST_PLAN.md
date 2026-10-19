@@ -140,13 +140,13 @@ Unit count note: 73 before and 74 after the pending-invite refinement in `invite
 
 ### 2026-10-19 — Landing page (same machine)
 
-| Command                               | Result                  | Notes                            |
-| ------------------------------------- | ----------------------- | -------------------------------- |
-| `pnpm test`                           | 99 passed / 99          |                                  |
-| `pnpm build`                          | Pass                    | `/`, `/app`, `/opengraph-image`  |
-| `pnpm test:e2e`                       | 45 passed (55 skipped)  | adds `tests/e2e/landing.spec.ts` |
-| `SCREENSHOTS=1 … screenshots.spec.ts` | 27 passed               | 9 pages × 3 breakpoints          |
-| GitHub Actions (landing push)         | See `docs/DAILY_LOG.md` |                                  |
+| Command                                           | Result                 | Notes                                                                                               |
+| ------------------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------- |
+| `pnpm test`                                       | 99 passed / 99         |                                                                                                     |
+| `pnpm build`                                      | Pass                   | `/`, `/app`, `/opengraph-image`                                                                     |
+| `pnpm test:e2e`                                   | 45 passed (55 skipped) | adds `tests/e2e/landing.spec.ts`                                                                    |
+| `SCREENSHOTS=1 … screenshots.spec.ts`             | 27 passed              | 9 pages × 3 breakpoints                                                                             |
+| GitHub Actions run 39318041337 (commit `fc7024f`) | Success                | first landing push failed axe on mobile mid-animation; fixed by settling animations before analysis |
 
 ### Not yet executed
 
