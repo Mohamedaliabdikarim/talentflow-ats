@@ -86,15 +86,15 @@ Unit count note: 73 before and 74 after the pending-invite refinement in `invite
 
 ### 2026-10-19 — MCP verification and Phase 3a (same machine)
 
-| Command / call                                      | Result                                               | Notes                                 |
-| --------------------------------------------------- | ---------------------------------------------------- | ------------------------------------- |
-| `claude mcp list`                                   | `supabase … ✔ Connected`                             | after the owner's OAuth               |
-| MCP `get_project_url` (read-only, headless session) | `{"url":"https://zcxmyaxpftzwpzvmhslm.supabase.co"}` | project ref confirmed                 |
-| MCP `list_tables` public / `list_migrations`        | `[]` / `[]`                                          | hosted schema untouched               |
-| `pnpm test`                                         | 92 passed / 92 (7 files)                             | adds the Kanban component test        |
-| `pnpm build`                                        | Pass                                                 |                                       |
-| `pnpm test:e2e`                                     | 14 passed / 14                                       | 10 smoke + 4 axe accessibility checks |
-| GitHub Actions (Phase 3a push)                      | See `docs/DAILY_LOG.md`                              |                                       |
+| Command / call                                      | Result                                               | Notes                                                                         |
+| --------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `claude mcp list`                                   | `supabase … ✔ Connected`                             | after the owner's OAuth                                                       |
+| MCP `get_project_url` (read-only, headless session) | `{"url":"https://zcxmyaxpftzwpzvmhslm.supabase.co"}` | project ref confirmed                                                         |
+| MCP `list_tables` public / `list_migrations`        | `[]` / `[]`                                          | hosted schema untouched                                                       |
+| `pnpm test`                                         | 92 passed / 92 (7 files)                             | adds the Kanban component test                                                |
+| `pnpm build`                                        | Pass                                                 |                                                                               |
+| `pnpm test:e2e`                                     | 14 passed / 14                                       | 10 smoke + 4 axe accessibility checks                                         |
+| GitHub Actions run 39302083064 (commit `62bbdbd`)   | Success                                              | Clean Ubuntu checkout: all steps green, including db:verify (31) and E2E (14) |
 
 ### Not yet executed
 

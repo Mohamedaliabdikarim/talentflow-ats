@@ -199,14 +199,14 @@ Not run: Playwright E2E (needs browsers and, for authenticated flows, a hosted S
 
 **Tests run and exact results:**
 
-| Command                        | Result                                                              |
-| ------------------------------ | ------------------------------------------------------------------- |
-| `pnpm lint` / `pnpm typecheck` | Pass                                                                |
-| `pnpm test`                    | 92 passed / 92 in 7 files (adds `tests/unit/kanban-board.test.tsx`) |
-| `pnpm build`                   | Pass                                                                |
-| `pnpm test:e2e`                | 14 passed / 14: 10 smoke + 4 axe (chromium + mobile), 23.1 s        |
-| `pnpm db:verify`               | unchanged since the Phase 2 run (31 passed); re-run by CI           |
-| GitHub Actions (this push)     | Recorded below                                                      |
+| Command                                                          | Result                                                                                             |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `pnpm lint` / `pnpm typecheck`                                   | Pass                                                                                               |
+| `pnpm test`                                                      | 92 passed / 92 in 7 files (adds `tests/unit/kanban-board.test.tsx`)                                |
+| `pnpm build`                                                     | Pass                                                                                               |
+| `pnpm test:e2e`                                                  | 14 passed / 14: 10 smoke + 4 axe (chromium + mobile), 23.1 s                                       |
+| `pnpm db:verify`                                                 | unchanged since the Phase 2 run (31 passed); re-run by CI                                          |
+| GitHub Actions run 39302083064 (commit `62bbdbd`, ubuntu-latest) | Success: lint, typecheck, unit (92), db:verify (31), build, bundle grep, Playwright (14 incl. axe) |
 
 **Security/privacy review:**
 
