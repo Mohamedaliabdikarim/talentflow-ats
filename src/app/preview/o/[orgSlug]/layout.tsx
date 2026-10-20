@@ -24,6 +24,7 @@ export default async function PreviewWorkspaceLayout({
 
   return (
     <AppShell
+      theme="app"
       title={PREVIEW_ORGANIZATION.name}
       subtitle="Your role: owner (preview)"
       items={nav}

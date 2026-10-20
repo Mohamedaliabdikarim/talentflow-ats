@@ -59,14 +59,30 @@ export function NavLink({ item, onNavigate }: { item: NavItem; onNavigate?: () =
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex min-h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium transition-colors duration-150",
+        "group relative flex min-h-10 items-center gap-2.5 rounded-lg px-3 text-sm font-medium transition-colors duration-150",
         "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
         active
           ? "bg-sidebar-accent text-sidebar-accent-foreground"
-          : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
       )}
     >
-      <Icon className="size-4" aria-hidden />
+      {/* Active indicator: a short accent bar on the leading edge. */}
+      <span
+        aria-hidden
+        className={cn(
+          "absolute top-1/2 left-0 h-5 w-0.5 -translate-y-1/2 rounded-full bg-sidebar-primary transition-opacity duration-150",
+          active ? "opacity-100" : "opacity-0",
+        )}
+      />
+      <Icon
+        className={cn(
+          "size-4 transition-colors",
+          active
+            ? "text-sidebar-primary"
+            : "text-sidebar-foreground/60 group-hover:text-sidebar-foreground",
+        )}
+        aria-hidden
+      />
       {item.label}
     </Link>
   );

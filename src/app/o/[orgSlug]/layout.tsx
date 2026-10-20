@@ -33,6 +33,7 @@ export default async function WorkspaceLayout({
 
   return (
     <AppShell
+      theme="app"
       title={organization.name}
       subtitle={
         organization.actingAsAdmin ? "Platform admin access" : `Your role: ${organization.role}`

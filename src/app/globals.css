@@ -161,6 +161,71 @@
   --landing-glow-violet: rgba(139, 92, 246, 0.3);
 }
 
+/*
+ * Authenticated customer workspace theme (docs/DESIGN.md §8). The same navy design
+ * language as the landing page, tuned for a dense application: cards sit one step above
+ * the canvas for elevation, the sidebar is a touch darker, and a hairline accent separates
+ * surfaces. Scoped to the workspace shell (AppShell theme="app"), so the platform-admin
+ * area and the landing page are unaffected. Token names match shadcn, so every component
+ * adopts the theme without per-page styling.
+ */
+.app {
+  color-scheme: dark;
+  --background: #070a12;
+  --foreground: #e7ebf4;
+  --card: #0e1426;
+  --card-foreground: #e7ebf4;
+  --popover: #0e1426;
+  --popover-foreground: #e7ebf4;
+  --primary: #6d8cff;
+  --primary-foreground: #060910;
+  --secondary: #141c34;
+  --secondary-foreground: #e7ebf4;
+  --muted: #121930;
+  --muted-foreground: #98a2b7;
+  --accent: #1c2650;
+  --accent-foreground: #cdd7ff;
+  --destructive: #fb7185;
+  --border: #ffffff14;
+  --input: #ffffff24;
+  --ring: #6d8cff;
+  --chart-1: #6d8cff;
+  --chart-2: #38bdf8;
+  --chart-3: #34d399;
+  --chart-4: #fbbf24;
+  --chart-5: #fb7185;
+  --sidebar: #090d1a;
+  --sidebar-foreground: #e7ebf4;
+  --sidebar-primary: #6d8cff;
+  --sidebar-primary-foreground: #060910;
+  --sidebar-accent: #1c2650;
+  --sidebar-accent-foreground: #cdd7ff;
+  --sidebar-border: #ffffff12;
+  --sidebar-ring: #6d8cff;
+}
+
+/* Sidebar surface: a soft top-down wash plus a hairline right edge, no glass blur. */
+.app-sidebar-surface {
+  background:
+    linear-gradient(180deg, rgba(109, 140, 255, 0.06) 0%, rgba(109, 140, 255, 0) 30%),
+    var(--sidebar);
+}
+
+/* Brand mark gradient, reused by the sidebar and the mobile header. */
+.app-brand-mark {
+  background: linear-gradient(135deg, #6d8cff 0%, #a855f7 100%);
+}
+
+/*
+ * One restrained accent wash behind a page header (dashboard). Transform/opacity only
+ * where it animates elsewhere; here it is static and sits under the content.
+ */
+.app-aurora {
+  background:
+    radial-gradient(60% 120% at 0% 0%, rgba(109, 140, 255, 0.12) 0%, rgba(109, 140, 255, 0) 60%),
+    radial-gradient(50% 120% at 100% 0%, rgba(168, 85, 247, 0.1) 0%, rgba(168, 85, 247, 0) 55%);
+}
+
 /* Slow drift for the hero glow (docs/DESIGN.md §7: 12 s loop, disabled by the reduced-motion rule below). */
 @keyframes landing-drift {
   0%,

@@ -46,6 +46,23 @@ export function stageIcon(stage: ApplicationStage): LucideIcon {
   return STAGE_PRESENTATION[stage].icon;
 }
 
+/**
+ * Per-stage accent for the Kanban column header icon, giving each column a quiet identity.
+ * Decorative only (the label carries the meaning), so it is not a contrast-critical colour.
+ */
+const STAGE_ACCENT: Record<ApplicationStage, string> = {
+  new: "text-slate-400",
+  screening: "text-sky-400",
+  interview: "text-violet-400",
+  offer: "text-amber-400",
+  hired: "text-emerald-400",
+  rejected: "text-rose-400",
+};
+
+export function stageAccentClass(stage: ApplicationStage): string {
+  return STAGE_ACCENT[stage];
+}
+
 export function StageBadge({ stage, className }: { stage: ApplicationStage; className?: string }) {
   const { icon: Icon, tone } = STAGE_PRESENTATION[stage];
   return (

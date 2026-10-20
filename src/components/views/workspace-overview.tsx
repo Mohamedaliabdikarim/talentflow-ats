@@ -25,23 +25,30 @@ export function WorkspaceOverviewView({
 }) {
   return (
     <FadeIn>
-      <PageHeader
-        title={organizationName}
-        description="Live counts for this workspace."
-        actions={
-          <>
-            <Button asChild variant="outline">
-              <Link href={`${base}/jobs/new`}>Post job</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href={`${base}/candidates/new`}>Add candidate</Link>
-            </Button>
-            <Button asChild>
-              <Link href={`${base}/pipeline`}>Open pipeline</Link>
-            </Button>
-          </>
-        }
-      />
+      <div className="relative">
+        {/* Static, decorative accent wash behind the header (reduced-motion safe). */}
+        <span
+          aria-hidden
+          className="app-aurora pointer-events-none absolute -top-8 right-0 left-0 -z-10 h-40 rounded-3xl"
+        />
+        <PageHeader
+          title={organizationName}
+          description="Live counts for this workspace."
+          actions={
+            <>
+              <Button asChild variant="outline">
+                <Link href={`${base}/jobs/new`}>Post job</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href={`${base}/candidates/new`}>Add candidate</Link>
+              </Button>
+              <Button asChild>
+                <Link href={`${base}/pipeline`}>Open pipeline</Link>
+              </Button>
+            </>
+          }
+        />
+      </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Link href={`${base}/jobs`} className={CARD_LINK}>
           <StatCard label="Jobs" value={counts.jobs} />

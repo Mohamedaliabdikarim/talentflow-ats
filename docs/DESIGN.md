@@ -93,7 +93,7 @@ Transforms and opacity only; no width/height animation; animations are interrupt
 
 Loading (skeletons that reserve space), empty (explanation + primary action), error (message + retry), permission denied (clear text, no data leak), success (toast, 4 s, non-focus-stealing).
 
-## 8. Public landing page and the dashboard refresh direction (2026-10-19)
+## 8. Public landing page and the customer workspace theme
 
 ### 8.1 Landing page system (`/`)
 
@@ -118,15 +118,28 @@ Accessibility: landmarks (`header`, `nav`, `main`, `footer`), skip link, visible
 
 SEO: absolute title "TalentFlow — Hire with clarity. Move talent forward.", description, Open Graph and Twitter card metadata, generated `/opengraph-image` (1200×630) without external assets.
 
-### 8.2 Dashboard refresh direction (proposal, awaiting approval)
+### 8.2 Customer workspace theme (implemented 2026-10-20, ADR-032)
 
-The showcase on the landing page _is_ the proposed look of the application in dark mode: the `.landing` tokens are a complete shadcn token set, so applying them as the app's `.dark` theme is a CSS-only change. Proposed, not applied:
+The customer workspace now uses the landing's navy design language, scoped to the authenticated workspace shell so the platform-admin area and the landing page are unchanged. It is a token-driven change: a `.app` scope in `src/app/globals.css` redefines the shadcn tokens, applied by `AppShell theme="app"` (the real workspace layout and the preview workspace layout pass it; the admin layout does not). No server action, route, data path, or server component logic changed.
 
-1. **Dark theme → navy.** Replace the warm-stone dark tokens with the landing set (surfaces `#070a12/#0c1120`, borders `white/8%`, primary `#6d8cff`). Light theme keeps warm neutrals but moves primary from indigo `#4338ca` to the landing blue `#4f6bff` (contrast on white 5.3:1) for continuity.
-2. **Stat cards.** Add a 2 px gradient top edge (blue → violet) and a leading icon per metric; keep tabular numerals.
-3. **Pipeline columns.** A 3 px stage-tint stripe under each column header (same tints as `StageBadge`) and a softer column background in dark mode.
-4. **Sidebar.** Active item gets a 2 px primary bar on the left plus the accent fill; wordmark uses the gradient tile from the landing.
-5. **Elevation.** 1 px borders + one soft shadow level for frames and dialogs; no stacked shadows.
-6. **Empty states.** Short gradient dot + headline + one action, matching the landing's eyebrow style.
+| Token (`.app`)                          | Value                             | Use                                     |
+| --------------------------------------- | --------------------------------- | --------------------------------------- |
+| `--background` / `--card` / `--sidebar` | `#070a12` / `#0e1426` / `#090d1a` | canvas, elevated cards, sidebar         |
+| `--foreground` / `--muted-foreground`   | `#e7ebf4` / `#98a2b7`             | text (muted ≥ 4.5:1 on card and canvas) |
+| `--primary` / `--primary-foreground`    | `#6d8cff` / `#060910`             | buttons, links, focus ring, active nav  |
+| `--accent` / `--accent-foreground`      | `#1c2650` / `#cdd7ff`             | active nav fill, hover                  |
+| `--border` / `--input`                  | `#ffffff14` / `#ffffff24`         | hairline separators, field borders      |
 
-Evidence to review: `docs/screenshots/landing-desktop-1440.png` (hero and showcase) against `docs/screenshots/dashboard-desktop-1440.png` (current light app). On approval the change is one commit (tokens + four small component tweaks) and will be screenshot-verified the same way.
+Cards sit one step above the canvas (`#0e1426` on `#070a12`) for elevation, matching the landing while reading as a denser application surface.
+
+Implemented component polish (shared components, so they adapt per theme scope and the admin area keeps its light look):
+
+1. **Shell.** Gradient brand tile (`.app-brand-mark`, blue → violet), 64 px sidebar with a soft top wash (`.app-sidebar-surface`), a sticky top bar with a subtle backdrop blur (no glass panels), and a centered `max-w-6xl` content column.
+2. **Navigation.** Active item gets a short primary bar on the leading edge, an accent fill, and a primary-tinted icon; inactive items lift on hover. `aria-current` unchanged.
+3. **Stat cards.** Elevated card with a hairline top accent that warms on hover and a small lift; tabular numerals; larger metric type.
+4. **Pipeline.** Rounded navy columns with a header divider, a per-stage accent icon (`stageAccentClass`: slate / sky / violet / amber / emerald / rose), bordered count pills, and cards that highlight their border on hover and while dragging. Compact, horizontally scrollable, draggable, and menu-movable as before.
+5. **Headers and empty states.** Page headers gain a bottom divider and balanced titles; empty states are a rounded dashed panel with centered copy and one action; the dashboard header carries one static accent wash (`.app-aurora`, reduced-motion safe).
+
+Accessibility: all workspace preview pages pass axe (`tests/e2e/preview.spec.ts`) under the new theme at desktop and mobile; contrast of muted text and the primary accent meets 4.5:1. Verified visually in `docs/screenshots/{dashboard,pipeline,jobs,candidates}-*.png` (desktop/tablet/mobile) with no horizontal overflow at 375/768/1440 px. The landing page and its embedded product showcase are unchanged in structure and now share the same refined Kanban cosmetics.
+
+Not in scope (unchanged): the platform-admin area (light theme, functional), authentication/RLS/tenant isolation, and the data model.

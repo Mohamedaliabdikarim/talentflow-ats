@@ -7,7 +7,7 @@ import { useCallback, useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { cn } from "cn";
 import type { ActionState } from "@/lib/action-state";
-import { stageIcon } from "@/components/stage-badge";
+import { stageAccentClass, stageIcon } from "@/components/stage-badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -130,23 +130,25 @@ export function KanbanBoard({
                 aria-labelledby={`stage-${stage}`}
                 data-stage={stage}
                 className={cn(
-                  "flex w-64 shrink-0 flex-col rounded-lg border bg-muted/40 transition-colors duration-150 sm:w-72",
-                  dropTarget === stage && "border-primary bg-accent/60",
+                  "flex w-64 shrink-0 flex-col rounded-xl border bg-card/50 transition-colors duration-150 sm:w-72",
+                  dropTarget === stage
+                    ? "border-primary/70 bg-accent/50 ring-1 ring-primary/40"
+                    : "border-border",
                 )}
               >
-                <header className="flex items-center gap-2 px-3 py-2">
-                  <Icon className="size-4 text-muted-foreground" aria-hidden="true" />
-                  <h2 id={`stage-${stage}`} className="text-sm font-semibold">
+                <header className="flex items-center gap-2 border-b border-border/70 px-3 py-2.5">
+                  <Icon className={cn("size-4", stageAccentClass(stage))} aria-hidden="true" />
+                  <h2 id={`stage-${stage}`} className="text-sm font-semibold tracking-tight">
                     {STAGE_LABELS[stage]}
                   </h2>
                   <span
-                    className="ml-auto rounded-full bg-background px-2 text-xs tabular-nums text-muted-foreground"
+                    className="ml-auto rounded-full border border-border bg-background px-2 text-xs font-medium tabular-nums text-muted-foreground"
                     aria-label={`${column.length} in ${STAGE_LABELS[stage]}`}
                   >
                     {column.length}
                   </span>
                 </header>
-                <ul className="flex min-h-24 flex-col gap-2 px-2 pb-2">
+                <ul className="flex min-h-24 flex-col gap-2 p-2">
                   <AnimatePresence initial={false}>
                     {column.map((card) => (
                       <KanbanCard
@@ -160,7 +162,7 @@ export function KanbanBoard({
                     ))}
                   </AnimatePresence>
                   {column.length === 0 ? (
-                    <li className="rounded-md border border-dashed px-3 py-4 text-center text-xs text-muted-foreground">
+                    <li className="rounded-lg border border-dashed border-border/70 px-3 py-6 text-center text-xs text-muted-foreground">
                       No candidates
                     </li>
                   ) : null}
@@ -214,8 +216,8 @@ function KanbanCard({
       exit={{ opacity: 0, transition: exitTransition }}
       transition={{ ...enterTransition, layout: cardSpring }}
       className={cn(
-        "cursor-grab touch-pan-y rounded-md border bg-card p-3 shadow-xs active:cursor-grabbing",
-        dragging && "shadow-lg",
+        "cursor-grab touch-pan-y rounded-lg border border-border bg-card p-3 shadow-xs transition-colors duration-150 hover:border-primary/40 active:cursor-grabbing",
+        dragging && "border-primary/60 shadow-lg",
       )}
     >
       <div className="flex items-start justify-between gap-2">
