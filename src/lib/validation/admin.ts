@@ -22,6 +22,20 @@ export const reissueInvitationSchema = z.object({
   membershipId: z.uuid("Unknown membership"),
 });
 
+/** Platform-admin membership management (ADR-040): both schemas pin the organization. */
+export const changeMembershipRoleSchema = z.object({
+  organizationId: z.uuid("Unknown organization"),
+  membershipId: z.uuid("Unknown membership"),
+  role: membershipRoleSchema,
+});
+
+export const MEMBERSHIP_STATUS_ACTIONS = ["deactivate", "reactivate"] as const;
+export const setMembershipStatusSchema = z.object({
+  organizationId: z.uuid("Unknown organization"),
+  membershipId: z.uuid("Unknown membership"),
+  action: z.enum(MEMBERSHIP_STATUS_ACTIONS),
+});
+
 export const grantPlatformAdminSchema = z.object({
   email: z.email("Enter a valid email address").max(254),
   fullName: optionalText(160),

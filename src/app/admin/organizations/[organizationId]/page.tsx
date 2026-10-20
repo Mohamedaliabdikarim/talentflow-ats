@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ExternalLink } from "lucide-react";
 import { InviteUserForm } from "@/components/forms/invite-user-form";
+import { MembershipControls } from "@/components/forms/membership-controls";
 import { FadeIn } from "@/components/motion/fade-in";
 import { formatDateTime, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -38,8 +39,23 @@ export default async function OrganizationDetailPage({
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
         <section className="min-w-0">
           <h2 className="text-lg font-semibold">Members</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Change roles, deactivate or reactivate access. An organization always keeps at least one
+            active owner. Every change is audited.
+          </p>
           <div className="mt-3">
-            <MembersTable members={members} showResend />
+            <MembersTable
+              members={members}
+              showResend
+              renderActions={(member) => (
+                <MembershipControls
+                  organizationId={organization.id}
+                  membershipId={member.membershipId}
+                  role={member.role}
+                  status={member.status}
+                />
+              )}
+            />
           </div>
         </section>
         <section>

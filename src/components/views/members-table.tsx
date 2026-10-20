@@ -9,19 +9,29 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { Enums } from "@/lib/supabase/database.types";
 import type { MemberRow } from "@/server/data/admin";
+
+const STATUS_LABELS: Record<Enums<"membership_status">, string> = {
+  invited: "Invited",
+  active: "Active",
+  disabled: "Deactivated",
+};
 
 /**
  * Members list. `showResend` adds an Invitation column with a "Resend invite" control for
- * pending members; it is used only in the platform-admin organization view, never in the
- * customer workspace, where invitations are managed by the platform admin.
+ * pending members, and `renderActions` adds a Manage column (role change, deactivate,
+ * reactivate). Both are used only in the platform-admin organization view, never in the
+ * customer workspace, where membership is managed by the platform admin (ADR-040).
  */
 export function MembersTable({
   members,
   showResend = false,
+  renderActions,
 }: {
   members: MemberRow[];
   showResend?: boolean;
+  renderActions?: (member: MemberRow) => React.ReactNode;
 }) {
   if (members.length === 0) {
     return (
@@ -41,6 +51,7 @@ export function MembersTable({
             <TableHead>Status</TableHead>
             <TableHead>Since</TableHead>
             {showResend ? <TableHead>Invitation</TableHead> : null}
+            {renderActions ? <TableHead>Manage</TableHead> : null}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -51,7 +62,7 @@ export function MembersTable({
               <TableCell className="capitalize">{member.role}</TableCell>
               <TableCell>
                 <Badge variant={member.status === "active" ? "secondary" : "outline"}>
-                  {member.status}
+                  {STATUS_LABELS[member.status]}
                 </Badge>
               </TableCell>
               <TableCell className="text-muted-foreground">
@@ -65,6 +76,9 @@ export function MembersTable({
                     <span className="text-muted-foreground">—</span>
                   )}
                 </TableCell>
+              ) : null}
+              {renderActions ? (
+                <TableCell className="min-w-64">{renderActions(member)}</TableCell>
               ) : null}
             </TableRow>
           ))}

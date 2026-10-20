@@ -43,12 +43,13 @@
 
 Privileged operations and their guard:
 
-| Operation                                    | Guard                      | Client used  |
-| -------------------------------------------- | -------------------------- | ------------ |
-| Create organization                          | `requirePlatformAdmin()`   | service role |
-| Invite / create user, add membership         | `requirePlatformAdmin()`   | service role |
-| Grant platform admin                         | `requirePlatformAdmin()`   | service role |
-| All job / candidate / application operations | `requireOrgAccess()` + RLS | user-scoped  |
+| Operation                                    | Guard                                                  | Client used  |
+| -------------------------------------------- | ------------------------------------------------------ | ------------ |
+| Create organization                          | `requirePlatformAdmin()`                               | service role |
+| Invite / create user, add membership         | `requirePlatformAdmin()`                               | service role |
+| Grant platform admin                         | `requirePlatformAdmin()`                               | service role |
+| Change member role, deactivate / reactivate  | `requirePlatformAdmin()` + conditional write (ADR-040) | service role |
+| All job / candidate / application operations | `requireOrgAccess()` + RLS                             | user-scoped  |
 
 ## 5. Secrets and configuration
 

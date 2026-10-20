@@ -1136,3 +1136,26 @@ CV authorization behaviour is untouched: the consent columns, their values and t
 2. Whether candidates must be informed that their CV is read by AI at upload is an owner decision (ADR-039); the Azure retention question (`docs/AI_INSIGHTS.md` §2) is unchanged.
 
 Docs: ADR-039, `docs/AI_INSIGHTS.md` §9, `docs/SECURITY.md` §9 addendum, `docs/TEST_PLAN.md` T46–T48, `docs/PRD.md` R05 (and R19 corrected to Implemented for ADR-038), `CLAUDE.md`.
+
+## 2026-10-21 (continued) — Permissions audit follow-up: dev-server fix for CV extraction, platform-admin membership management (ADR-040)
+
+**1. CV extraction "nothing happens" on the local app — root cause and fix (no code change).** The dev server started earlier in the session had compiled `src/server/actions/candidate-extract.ts` while it briefly exported a constant; Turbopack rejects that in a `"use server"` file and the module graph stayed in the error state ("The module has no exports at all"), so the Add candidate page received a form without a working action. The fix on disk (67d5f4b) was correct. Action taken: stopped the stale server (pid 13152) and started a fresh one on 127.0.0.1:3000 (log: scratchpad `dev-server-3000-restart.log`). Verification: `/login` 200; the public preview form page renders with the CV input and no error overlay; the only client chunk referencing the action compiled cleanly (client reference present, 0 error stubs). The errors still printed in the new terminal log are prefixed `[browser]`: they are relayed from the owner's still-open tabs that hold the old bundle. **What the owner must do:** hard-reload the Add candidate tab (or close and reopen it); then choose a PDF and watch for "Reading the CV to prefill the form…".
+
+**2. Platform-admin membership management (ADR-040), implemented locally.** On `/admin/organizations/[id]`, a Manage column per member: change role between Owner and Member (active members only), deactivate with an inline confirmation, reactivate. Reuses the existing `membership_status` value `disabled`, so **no migration and nothing to push**: access ends at the database immediately (`is_org_member()` and the server context require `active`) and `activate_my_memberships()` cannot bring a deactivated membership back. Invariant: at least one active owner per organization (demotion and deactivation of the last one are refused). Guard `requirePlatformAdmin()` before any service-role use; the membership must belong to the organization named in the form; writes are conditional on the decided state ("changed meanwhile" instead of a stale write); audit `membership.role_changed` / `membership.deactivated` / `membership.reactivated` with ids only. Pending invitations are not deactivatable (resend or let expire). Status badge now reads Invited / Active / Deactivated. Not implemented, by decision: owner-managed invitations, new roles, organization suspension, owner-only recruitment permissions.
+
+**3. Negative tests added.** `tests/db/membership-management.test.ts`: a member cannot promote themselves or anyone; an owner cannot change roles, deactivate or delete memberships, nor insert a membership; neither role can insert into `platform_admins`; members see only their own tenant's roster; a platform admin can change role and status; a deactivated member loses tenant access immediately and `activate_my_memberships()` returns 0. `tests/unit/membership-actions.test.ts`: non-admins refused before the service role is touched, signed-out redirected, validation, cross-organization membership treated as missing, last-owner rule, pending/deactivated transitions, concurrent-change handling, ids-only audit. `tests/unit/membership-controls.test.tsx`: controls per status and the deactivate confirmation.
+
+**Commands and results (this machine):**
+
+| Command                  | Result                                                                          |
+| ------------------------ | ------------------------------------------------------------------------------- |
+| `pnpm typecheck`         | pass                                                                            |
+| `pnpm lint`              | 0 errors (7 pre-existing warnings, none new)                                    |
+| `pnpm test`              | 38 files, **368/368**                                                           |
+| `pnpm db:verify`         | 9 files, **90/90** on 8 migrations (no schema change)                           |
+| `pnpm build`             | pass                                                                            |
+| Dev server after restart | login 200; preview form page 200 without overlay; action chunk compiled cleanly |
+
+**Limitations:** the last-owner rule is enforced server-side with conditional writes, not inside one database transaction, so two admins demoting two different owners at the same instant could leave none (acceptable for an admin-only operation; a SECURITY DEFINER function is the follow-up if needed). Live admin test of role change / deactivate / reactivate pending the owner (T49 covers logic, not the hosted round-trip). Committed locally only; not pushed.
+
+Docs: ADR-040, `docs/SECURITY.md` §4 table, `docs/TEST_PLAN.md` T49–T50, `docs/PRD.md` R02, `CLAUDE.md` roles convention.
