@@ -115,6 +115,17 @@ const candidate = (
   linkedin_url: null,
   github_url: null,
   notes: null,
+  // CV upload is a hosted-Storage feature; the preview keeps candidates without a CV.
+  cv_object_key: null,
+  cv_filename: null,
+  cv_size_bytes: null,
+  cv_uploaded_at: null,
+  cv_uploaded_by: null,
+  cv_source: null,
+  cv_ai_authorized: false,
+  cv_ai_authorized_at: null,
+  cv_ai_authorized_by: null,
+  cv_ai_authorization_basis: null,
   ...fields,
 });
 

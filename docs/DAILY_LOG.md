@@ -815,3 +815,34 @@ Skips are deliberate: opt-in screenshot captures (`SCREENSHOTS=1`) and the singl
 One regression found and fixed during verification: a new sidebar footer used `text-muted-foreground/70`, which failed axe contrast (3.58:1) on the **light admin** preview sidebar; changed to full `text-muted-foreground`. All preview workspace pages pass axe under the new navy theme. The mutating preview board E2E flaked once under full-suite contention and passed in isolation (11/11) and on a clean re-run (45 passed); the Kanban move and drag interactions are intact.
 
 **Boundaries honoured:** no hosted writes, no invitations, no Auth changes, no deploy, no AI, no real customer records touched; admin area and landing left intact; no database migration (none needed).
+
+## 2026-10-21 — Candidate CV PDF upload with private Storage and AI-use consent (ADR-033)
+
+**Request:** secure candidate CV PDF upload/view/download/replace/delete with private Supabase Storage, strict tenant isolation, server-side validation, unpredictable keys, orphan-safe behaviour, audit, a consent model (upload ≠ AI permission), and tests. Inspect first, present a plan, then implement LOCAL code and migrations only — no hosted writes.
+
+**Implemented (local):**
+
+- Migration `20261021120000_candidate_cv.sql` adds CV metadata and consent columns to `candidates`, with checks (10 MB, all-or-nothing CV metadata, AI authorization requires a CV and a timestamp). Applied locally only; `pnpm db:types` regenerated.
+- Private bucket + `storage.objects` RLS in `supabase/storage/candidate-cvs.sql` (hosted setup, documented, **not applied**). Keys are `<org>/<candidate>/<random>.pdf`.
+- `src/lib/validation/cv.ts`: PDF type + `%PDF-` signature, 10 MB limit, filename sanitization, server-generated keys.
+- `src/server/actions/candidate-cv.ts`: upload/replace/delete and consent record/revoke, all via `requireOrgAccess` + the user-scoped client (candidates RLS + storage RLS), audit events (ids only), compensation on partial failure. Create-time upload added to `createCandidateAction` (atomic rollback on failure); `deleteCandidateAction` now also removes the CV object.
+- `src/app/o/[orgSlug]/candidates/[candidateId]/cv/route.ts`: streams the PDF through the server (inline / `?download=1`), never exposing a signed or public URL.
+- UI: `CandidateCvCard` on the real candidate detail page (empty/present states, View/Download/Replace/Delete, and the AI-authorization panel — unchecked confirmation, stated basis, revoke); optional PDF field on the create form. Preview is unaffected.
+
+**Tests:** `cv-validation` (type/size/signature/filename/key), `candidate-cv-actions` (authorization, invalid file, consent reset, replace, compensation, delete, authorize/revoke), `candidate-cv-card` jsdom (states, consent never pre-checked), `tests/db/candidate-cv` (cross-tenant CV metadata isolation, consent check constraints, and storage-policy isolation against an emulated `storage.objects`).
+
+**Verification:**
+
+| Command                        | Result                                                                  |
+| ------------------------------ | ----------------------------------------------------------------------- |
+| `pnpm lint` / `pnpm typecheck` | Pass (lint: 5 warnings for required-but-unused action-signature params) |
+| `pnpm test`                    | 163 passed / 163 (16 files)                                             |
+| `pnpm db:verify`               | 63 passed / 63 (6 files)                                                |
+| `pnpm build`                   | Compiled successfully (standalone)                                      |
+| `pnpm test:e2e`                | 45 passed, 55 skipped                                                   |
+
+The full build type-checks test files, which caught a `File`/`Uint8Array` typing issue in a test (fixed) that `tsc` alone had not re-run; the standalone build then completed. The preview board move test flaked once under full-suite contention and passed on a clean re-run.
+
+**Unverified without hosted Storage:** live upload/view/replace/delete round-trips (no local Supabase/PostgREST); covered by the validation, action, database, emulated-storage and jsdom tests.
+
+**Requires the owner's separate approval (not done):** push migration `0005`; apply `supabase/storage/candidate-cvs.sql` (bucket + policies). No hosted writes, no real candidate files, no Auth changes, no deploy, no AI analysis in this phase.

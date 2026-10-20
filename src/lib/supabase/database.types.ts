@@ -233,6 +233,16 @@ export type Database = {
           created_by: string | null;
           created_at: string;
           updated_at: string;
+          cv_object_key: string | null;
+          cv_filename: string | null;
+          cv_size_bytes: number | null;
+          cv_uploaded_at: string | null;
+          cv_uploaded_by: string | null;
+          cv_source: string | null;
+          cv_ai_authorized: boolean;
+          cv_ai_authorized_at: string | null;
+          cv_ai_authorized_by: string | null;
+          cv_ai_authorization_basis: string | null;
         };
         Insert: {
           id?: string;
@@ -248,6 +258,16 @@ export type Database = {
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          cv_object_key?: string | null;
+          cv_filename?: string | null;
+          cv_size_bytes?: number | null;
+          cv_uploaded_at?: string | null;
+          cv_uploaded_by?: string | null;
+          cv_source?: string | null;
+          cv_ai_authorized?: boolean;
+          cv_ai_authorized_at?: string | null;
+          cv_ai_authorized_by?: string | null;
+          cv_ai_authorization_basis?: string | null;
         };
         Update: {
           id?: string;
@@ -263,11 +283,35 @@ export type Database = {
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          cv_object_key?: string | null;
+          cv_filename?: string | null;
+          cv_size_bytes?: number | null;
+          cv_uploaded_at?: string | null;
+          cv_uploaded_by?: string | null;
+          cv_source?: string | null;
+          cv_ai_authorized?: boolean;
+          cv_ai_authorized_at?: string | null;
+          cv_ai_authorized_by?: string | null;
+          cv_ai_authorization_basis?: string | null;
         };
         Relationships: [
           {
             foreignKeyName: "candidates_created_by_fkey";
             columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "candidates_cv_ai_authorized_by_fkey";
+            columns: ["cv_ai_authorized_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "candidates_cv_uploaded_by_fkey";
+            columns: ["cv_uploaded_by"];
             isOneToOne: false;
             referencedRelation: "users";
             referencedColumns: ["id"];

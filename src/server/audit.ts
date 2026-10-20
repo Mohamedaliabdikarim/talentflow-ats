@@ -9,6 +9,11 @@ export type AuditAction =
   | "admin.granted"
   | "admin.context_entered"
   | "membership.activated"
+  | "candidate.cv_uploaded"
+  | "candidate.cv_replaced"
+  | "candidate.cv_deleted"
+  | "candidate.cv_ai_authorized"
+  | "candidate.cv_ai_revoked"
   | "auth.signed_in"
   | "auth.signed_out"
   | "auth.password_established";

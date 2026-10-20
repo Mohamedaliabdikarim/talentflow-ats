@@ -58,3 +58,18 @@ export const createCandidateSchema = candidateInputSchema.extend({
 });
 
 export type CreateCandidateInput = z.infer<typeof createCandidateSchema>;
+
+/**
+ * Recording AI-use authorization for a candidate-provided CV (docs/SECURITY.md §9): an
+ * explicit confirmation (never pre-checked) and a stated basis. Revocation needs no input.
+ */
+export const cvAiAuthorizationSchema = z.object({
+  confirm: z.literal("yes", { message: "Confirm the authorization to proceed" }),
+  basis: z
+    .string()
+    .trim()
+    .min(3, "State the basis for this authorization")
+    .max(500, "Keep the basis under 500 characters"),
+});
+
+export type CvAiAuthorizationInput = z.infer<typeof cvAiAuthorizationSchema>;

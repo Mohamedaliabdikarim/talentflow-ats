@@ -26,6 +26,8 @@ type CandidateDetailViewProps = {
   renderRemove?: (application: CandidateApplicationRow) => React.ReactNode;
   /** Delete control; omitted in read-only contexts. */
   dangerZone?: React.ReactNode;
+  /** CV upload/consent card; rendered on the real detail page, omitted in the preview. */
+  cvSection?: React.ReactNode;
 };
 
 export function CandidateDetailView({
@@ -35,6 +37,7 @@ export function CandidateDetailView({
   actions,
   renderRemove,
   dangerZone,
+  cvSection,
 }: CandidateDetailViewProps) {
   const facts: Array<[string, React.ReactNode]> = [
     ["Email", candidate.email ?? "—"],
@@ -132,6 +135,7 @@ export function CandidateDetailView({
           </section>
         </div>
         <aside className="min-w-0 space-y-6">
+          {cvSection}
           <section className="rounded-lg border bg-card p-5">
             <h2 className="text-sm font-semibold">Profile</h2>
             <dl className="mt-3 space-y-3 text-sm">

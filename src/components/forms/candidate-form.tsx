@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useMemo } from "react";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -122,6 +123,29 @@ export function CandidateForm({
         hint="Internal notes. Keep to what is needed for the hiring decision."
         errors={fieldErrors?.notes}
       />
+      {!candidate ? (
+        <div className="space-y-1.5">
+          <Label htmlFor="cv">CV (PDF, optional)</Label>
+          <Input
+            id="cv"
+            name="cv"
+            type="file"
+            accept="application/pdf"
+            className="text-sm"
+            aria-invalid={fieldErrors?.cv ? true : undefined}
+            aria-describedby={fieldErrors?.cv ? "cv-error" : "cv-hint"}
+          />
+          {fieldErrors?.cv ? (
+            <p id="cv-error" className="text-sm text-destructive">
+              {fieldErrors.cv.join(" ")}
+            </p>
+          ) : (
+            <p id="cv-hint" className="text-xs text-muted-foreground">
+              Candidate-provided PDF, max 10 MB. Uploading does not authorize AI analysis.
+            </p>
+          )}
+        </div>
+      ) : null}
       {!candidate ? (
         <div className="space-y-1.5">
           <Label htmlFor="jobId">Add to job</Label>

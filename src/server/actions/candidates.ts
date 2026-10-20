@@ -5,7 +5,15 @@ import { redirect } from "next/navigation";
 import { type ActionState, errorState, fieldErrorsFromIssues } from "@/lib/action-state";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { candidateInputSchema, createCandidateSchema } from "@/lib/validation/candidate";
+import {
+  buildCvObjectKey,
+  CV_BUCKET,
+  CV_CONTENT_TYPE,
+  hasPdfSignature,
+  validateCvMetadata,
+} from "@/lib/validation/cv";
 import { runAction } from "@/server/actions/run";
+import { recordAuditEvent } from "@/server/audit";
 import { requireOrgAccess } from "@/server/auth";
 
 function candidateFields(formData: FormData) {
@@ -52,6 +60,22 @@ export async function createCandidateAction(
     if (!parsed.success) {
       return errorState("Check the highlighted fields", fieldErrorsFromIssues(parsed.error.issues));
     }
+
+    // Optional CV at creation time: validate the file fully before creating anything, so an
+    // invalid upload never leaves a half-created candidate.
+    const file = formData.get("cv");
+    let cvBytes: Uint8Array | null = null;
+    let cvFilename: string | null = null;
+    if (file instanceof File && file.size > 0) {
+      const metadata = validateCvMetadata({ name: file.name, type: file.type, size: file.size });
+      if (!metadata.ok) return errorState(metadata.message, { cv: [metadata.message] });
+      cvBytes = new Uint8Array(await file.arrayBuffer());
+      if (!hasPdfSignature(cvBytes.subarray(0, 5))) {
+        return errorState("That file is not a valid PDF.", { cv: ["Not a valid PDF"] });
+      }
+      cvFilename = metadata.filename;
+    }
+
     const supabase = await createServerSupabase();
 
     // Validate the optional job before creating anything so a bad job id leaves no orphan.
@@ -86,6 +110,45 @@ export async function createCandidateAction(
       if (applicationError) {
         throw new Error(`application insert failed: ${applicationError.message}`);
       }
+    }
+
+    // Store the CV last. If anything fails, roll the candidate back (cascades the application)
+    // so creation stays atomic: either the candidate and CV exist, or neither does.
+    if (cvBytes && cvFilename) {
+      const key = buildCvObjectKey(organization.id, data.id, crypto.randomUUID());
+      const upload = await supabase.storage
+        .from(CV_BUCKET)
+        .upload(key, cvBytes, { contentType: CV_CONTENT_TYPE, upsert: false });
+      const { error: cvError } = upload.error
+        ? { error: upload.error }
+        : await supabase
+            .from("candidates")
+            .update({
+              cv_object_key: key,
+              cv_filename: cvFilename,
+              cv_size_bytes: cvBytes.byteLength,
+              cv_uploaded_at: new Date().toISOString(),
+              cv_uploaded_by: organization.userId,
+              cv_source: "candidate_provided_recruiter_upload",
+            })
+            .eq("id", data.id)
+            .eq("organization_id", organization.id);
+      if (cvError) {
+        if (!upload.error) await supabase.storage.from(CV_BUCKET).remove([key]);
+        await supabase
+          .from("candidates")
+          .delete()
+          .eq("id", data.id)
+          .eq("organization_id", organization.id);
+        return errorState("Could not store the CV, so the candidate was not created. Try again.", {
+          cv: ["Upload failed"],
+        });
+      }
+      await recordAuditEvent("candidate.cv_uploaded", {
+        organizationId: organization.id,
+        targetType: "candidate",
+        targetId: data.id,
+      });
     }
 
     revalidateWorkspace(orgSlug);
@@ -124,12 +187,23 @@ export async function updateCandidateAction(
 export async function deleteCandidateAction(orgSlug: string, candidateId: string): Promise<void> {
   const organization = await requireOrgAccess(orgSlug);
   const supabase = await createServerSupabase();
+  // Read the CV key first so the storage object can be removed after the row is gone; the
+  // database cascade does not reach Storage, so this prevents an orphaned CV file.
+  const { data: candidate } = await supabase
+    .from("candidates")
+    .select("cv_object_key")
+    .eq("id", candidateId)
+    .eq("organization_id", organization.id)
+    .maybeSingle();
   const { error } = await supabase
     .from("candidates")
     .delete()
     .eq("id", candidateId)
     .eq("organization_id", organization.id);
   if (error) throw new Error(`candidate delete failed: ${error.message}`);
+  if (candidate?.cv_object_key) {
+    await supabase.storage.from(CV_BUCKET).remove([candidate.cv_object_key]);
+  }
   revalidateWorkspace(orgSlug);
   redirect(`/o/${orgSlug}/candidates`);
 }
