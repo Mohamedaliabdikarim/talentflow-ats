@@ -16,17 +16,34 @@ import { runAction } from "@/server/actions/run";
 import { recordAuditEvent } from "@/server/audit";
 import { requireOrgAccess } from "@/server/auth";
 
+const TEXT_FIELDS = [
+  "fullName",
+  "email",
+  "phone",
+  "headline",
+  "location",
+  "linkedinUrl",
+  "githubUrl",
+  "notes",
+] as const;
+
 function candidateFields(formData: FormData) {
-  return {
-    fullName: formData.get("fullName"),
-    email: formData.get("email"),
-    phone: formData.get("phone"),
-    headline: formData.get("headline"),
-    location: formData.get("location"),
-    linkedinUrl: formData.get("linkedinUrl"),
-    githubUrl: formData.get("githubUrl"),
-    notes: formData.get("notes"),
-  };
+  return Object.fromEntries(TEXT_FIELDS.map((name) => [name, formData.get(name)])) as Record<
+    (typeof TEXT_FIELDS)[number],
+    FormDataEntryValue | null
+  >;
+}
+
+/** Submitted text values echoed back on a validation error so the form keeps what was typed. */
+function submittedValues(formData: FormData): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const name of TEXT_FIELDS) {
+    const value = formData.get(name);
+    if (typeof value === "string") values[name] = value;
+  }
+  const jobId = formData.get("jobId");
+  if (typeof jobId === "string") values.jobId = jobId;
+  return values;
 }
 
 function toRow(input: ReturnType<typeof candidateInputSchema.parse>) {
@@ -58,7 +75,11 @@ export async function createCandidateAction(
       jobId: formData.get("jobId"),
     });
     if (!parsed.success) {
-      return errorState("Check the highlighted fields", fieldErrorsFromIssues(parsed.error.issues));
+      return errorState(
+        "Check the highlighted fields",
+        fieldErrorsFromIssues(parsed.error.issues),
+        submittedValues(formData),
+      );
     }
 
     // Optional CV at creation time: validate the file fully before creating anything, so an
@@ -166,7 +187,11 @@ export async function updateCandidateAction(
     const organization = await requireOrgAccess(orgSlug);
     const parsed = candidateInputSchema.safeParse(candidateFields(formData));
     if (!parsed.success) {
-      return errorState("Check the highlighted fields", fieldErrorsFromIssues(parsed.error.issues));
+      return errorState(
+        "Check the highlighted fields",
+        fieldErrorsFromIssues(parsed.error.issues),
+        submittedValues(formData),
+      );
     }
     const supabase = await createServerSupabase();
     const { data, error } = await supabase

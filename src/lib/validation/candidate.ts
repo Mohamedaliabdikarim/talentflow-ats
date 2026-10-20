@@ -52,9 +52,20 @@ export const candidateInputSchema = z.object({
 
 export type CandidateInput = z.infer<typeof candidateInputSchema>;
 
+/**
+ * Sentinel submitted by the "Add to job" select for "No job yet". Radix Select cannot use
+ * an empty string as an item value, so this stands in for "no selection" and the schema maps
+ * it (like an empty string) back to undefined — otherwise it would fail UUID validation.
+ */
+export const NO_JOB_OPTION = "none";
+
 /** Create form: optionally add the new candidate to a job in the same step. */
 export const createCandidateSchema = candidateInputSchema.extend({
-  jobId: z.preprocess(emptyToUndefined, z.uuid("Unknown job").optional()),
+  jobId: z.preprocess((value) => {
+    if (typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    return trimmed === "" || trimmed === NO_JOB_OPTION ? undefined : trimmed;
+  }, z.uuid("Select a job from this workspace").optional()),
 });
 
 export type CreateCandidateInput = z.infer<typeof createCandidateSchema>;

@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { idleState } from "@/lib/action-state";
+import { NO_JOB_OPTION } from "@/lib/validation/candidate";
 import { createCandidateAction, updateCandidateAction } from "@/server/actions/candidates";
 import { FormError, SubmitButton, TextAreaField, TextField } from "./fields";
 
@@ -34,8 +35,6 @@ type CandidateFormProps = {
   defaultJobId?: string;
 };
 
-const NO_JOB = "none";
-
 export function CandidateForm({
   orgSlug,
   candidate,
@@ -51,6 +50,10 @@ export function CandidateForm({
   );
   const [state, formAction] = useActionState(action, idleState);
   const fieldErrors = state.status === "error" ? state.fieldErrors : undefined;
+  // On a failed submit, repopulate from the echoed values so typed data is not lost.
+  const submitted = state.status === "error" ? state.values : undefined;
+  const fieldValue = (name: string, fallback?: string | null) =>
+    submitted?.[name] ?? fallback ?? "";
 
   return (
     <form action={formAction} className="space-y-4" noValidate>
@@ -60,14 +63,14 @@ export function CandidateForm({
         label="Full name"
         required
         autoComplete="off"
-        defaultValue={candidate?.full_name ?? ""}
+        defaultValue={fieldValue("fullName", candidate?.full_name)}
         errors={fieldErrors?.fullName}
       />
       <TextField
         name="headline"
         label="Headline"
         placeholder="Senior backend engineer"
-        defaultValue={candidate?.headline ?? ""}
+        defaultValue={fieldValue("headline", candidate?.headline)}
         errors={fieldErrors?.headline}
       />
       <div className="grid gap-4 sm:grid-cols-2">
@@ -76,7 +79,7 @@ export function CandidateForm({
           label="Email"
           type="email"
           autoComplete="off"
-          defaultValue={candidate?.email ?? ""}
+          defaultValue={fieldValue("email", candidate?.email)}
           errors={fieldErrors?.email}
         />
         <TextField
@@ -84,14 +87,14 @@ export function CandidateForm({
           label="Phone"
           type="tel"
           autoComplete="off"
-          defaultValue={candidate?.phone ?? ""}
+          defaultValue={fieldValue("phone", candidate?.phone)}
           errors={fieldErrors?.phone}
         />
       </div>
       <TextField
         name="location"
         label="Location"
-        defaultValue={candidate?.location ?? ""}
+        defaultValue={fieldValue("location", candidate?.location)}
         errors={fieldErrors?.location}
       />
       <div className="grid gap-4 sm:grid-cols-2">
@@ -102,7 +105,7 @@ export function CandidateForm({
           inputMode="url"
           placeholder="https://www.linkedin.com/in/name"
           hint="Stored for manual review only; nothing is fetched from LinkedIn."
-          defaultValue={candidate?.linkedin_url ?? ""}
+          defaultValue={fieldValue("linkedinUrl", candidate?.linkedin_url)}
           errors={fieldErrors?.linkedinUrl}
         />
         <TextField
@@ -111,7 +114,7 @@ export function CandidateForm({
           type="url"
           inputMode="url"
           placeholder="https://github.com/username"
-          defaultValue={candidate?.github_url ?? ""}
+          defaultValue={fieldValue("githubUrl", candidate?.github_url)}
           errors={fieldErrors?.githubUrl}
         />
       </div>
@@ -119,7 +122,7 @@ export function CandidateForm({
         name="notes"
         label="Notes"
         rows={5}
-        defaultValue={candidate?.notes ?? ""}
+        defaultValue={fieldValue("notes", candidate?.notes)}
         hint="Internal notes. Keep to what is needed for the hiring decision."
         errors={fieldErrors?.notes}
       />
@@ -149,12 +152,12 @@ export function CandidateForm({
       {!candidate ? (
         <div className="space-y-1.5">
           <Label htmlFor="jobId">Add to job</Label>
-          <Select name="jobId" defaultValue={defaultJobId ?? NO_JOB}>
+          <Select name="jobId" defaultValue={submitted?.jobId ?? defaultJobId ?? NO_JOB_OPTION}>
             <SelectTrigger id="jobId" className="w-full sm:w-72">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NO_JOB}>No job yet</SelectItem>
+              <SelectItem value={NO_JOB_OPTION}>No job yet</SelectItem>
               {jobOptions.map((job) => (
                 <SelectItem key={job.id} value={job.id}>
                   {job.title}

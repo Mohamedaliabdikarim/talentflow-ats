@@ -920,3 +920,21 @@ exit=0
 | Data                   | candidates 1, jobs 1, applications 1, organizations 1, memberships 1, auth users 2 — unchanged                                              |
 
 **Status:** the candidate CV feature is now fully provisioned on the hosted project (schema + private Storage + policies). Uploads will work in a deployed/authenticated environment. **Not done (await approval):** file uploads/tests against hosted Storage, deployment, AI integration.
+
+## 2026-10-21 (continued) — Fix: candidate creation failed with "No job yet" (Unknown job)
+
+**Bug:** creating a candidate with "No job yet" selected failed with "Could not submit — Check the highlighted fields" and a `jobId` field error "Unknown job"; the form also appeared to reset.
+
+**Root cause:** the "Add to job" Radix `Select` cannot use an empty-string item value, so "No job yet" submitted the sentinel `jobId = "none"`. `createCandidateSchema` only mapped empty strings to undefined (`emptyToUndefined`), so `"none"` passed through to `z.uuid()` and failed → "Unknown job". The form "reset" is React 19 re-initialising the uncontrolled fields to their (empty, create-mode) `defaultValue` after the action, discarding typed data.
+
+**Fix (no weakening of authorization or validation):**
+
+- `createCandidateSchema.jobId` now maps both empty/whitespace and the shared `NO_JOB_OPTION` sentinel to undefined before UUID validation; a real UUID still validates and a non-UUID is still rejected. The sentinel constant is exported and used by the form so the two cannot drift.
+- The distinction is explicit: no selection / empty / sentinel → no application; a valid in-org job → application created; a UUID not in the organization → rejected server-side ("Select a job from this workspace"); a malformed id → rejected by the schema.
+- Data preservation: `ActionState` error now carries optional `values`; the candidate actions echo the submitted text fields on a validation error and the form repopulates from them, so typed data survives a failed submit.
+
+**Reproduced and covered by regression tests:** `tests/unit/candidate-schema.test.ts` (sentinel/empty/valid/invalid jobId) and `tests/unit/candidate-create-action.test.ts` (no-job creates a candidate with no application; empty behaves the same; a real job creates the application; an unknown in-org job is rejected creating nothing; an attached PDF is stored and audited; values are echoed on error).
+
+**Verification:** `pnpm test` 174/174 (18 files), `pnpm db:verify` 63/63, `pnpm lint`/`pnpm typecheck` pass, `pnpm build` ok, `pnpm test:e2e` 45 passed / 55 skipped.
+
+**Read-only hosted check (requirement):** the failed submission created nothing — candidates total 1 (Alex Morgan intact, no CV), 0 synthetic test candidates, 0 `candidate-cvs` objects; jobs, applications and memberships unchanged. The validation error occurred before any insert, so there is no orphan candidate or Storage object to clean up. No hosted data was created, modified or deleted.

@@ -5,7 +5,13 @@
  */
 export type ActionState<TData = undefined> =
   | { status: "idle" }
-  | { status: "error"; message: string; fieldErrors?: Record<string, string[]> }
+  | {
+      status: "error";
+      message: string;
+      fieldErrors?: Record<string, string[]>;
+      /** Submitted text values, echoed back so a form can repopulate after a failed submit. */
+      values?: Record<string, string>;
+    }
   | { status: "success"; message?: string; data: TData };
 
 export const idleState: ActionState<never> = { status: "idle" };
@@ -13,8 +19,9 @@ export const idleState: ActionState<never> = { status: "idle" };
 export function errorState(
   message: string,
   fieldErrors?: Record<string, string[]>,
+  values?: Record<string, string>,
 ): ActionState<never> {
-  return { status: "error", message, fieldErrors };
+  return { status: "error", message, fieldErrors, values };
 }
 
 /** Flattens Zod issues into { field: [messages] } for inline rendering. */
