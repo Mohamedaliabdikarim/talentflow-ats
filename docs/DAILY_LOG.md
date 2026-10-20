@@ -1069,3 +1069,36 @@ Owner approval received for applying migrations 0006 and 0007 only, conditional 
 3. README quality varies (templates, marketing text); the prompt treats it as weak evidence, to be reviewed on real profiles.
 
 Docs: `docs/AI_INSIGHTS.md` §8, ADR-038, `docs/SECURITY.md` §10 (GitHub paragraph), `docs/DEPLOYMENT.md` (`GITHUB_TOKEN`), `docs/TEST_PLAN.md` T41–T45, `docs/PRD.md` R18, `CLAUDE.md`, `.env.example`.
+
+## 2026-10-21 (continued) — Approved push of migration 0008 (GitHub evidence) to the hosted project
+
+Owner approval received for migration 0008 only, conditional on a fresh dry-run showing nothing else pending, a destructive-change review, and proof that candidate data and CV authorization stay intact. No code changed; no deployment; no live GitHub analysis started.
+
+**Pre-flight (read-only):**
+
+- `SUPABASE_PROJECT_REF` confirmed as `zcxmyaxpftzwpzvmhslm`; remote history 7 applied, `20261021150000` local-only.
+- Fresh `pnpm supabase:hosted dry-run` used as a programmatic gate: the pending set had to equal exactly `["20261021150000_github_evidence.sql"]` or the script aborts. It did.
+- Active statements reviewed: four `add column` on `candidates` (one `not null default false`, three nullable) with three check constraints; four `add column` on `candidate_ai_insights` (one `not null default '{}'`, three nullable) with three check constraints; one partial index. The only destructive keyword is `on delete set null` on the `github_ai_authorized_by` reference to `auth.users`, a referential action for a deleted user that mirrors `cv_ai_authorized_by`; no `drop`/`delete`/`truncate`/`update`. Rollback statements are comments. File sha256 `54718e1d…2154`.
+- Baseline over the session pooler inside a `READ ONLY` transaction (counts and content-free md5 hashes over ids, CV keys, consent flags/timestamps, GitHub-URL presence, stages): organizations 1, jobs 2, candidates 2 (1 with CV, 0 CV-authorized, 1 with a GitHub URL), applications 2 (`new=1,screening=1`), candidate_ai_insights 1 (`revoked=1`), memberships 1, audit events 21.
+
+**Apply:** `pnpm supabase:hosted push` → "Applying migration 20261021150000_github_evidence.sql… Finished supabase db push." exit 0.
+
+**Verification (read-only, same queries):**
+
+| Check                                                                                               | Before                                | After                                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Migration history rows / latest                                                                     | 7 / 20261021140000                    | 8 / 20261021150000                                                                                                                                                                                           |
+| GitHub columns present (8 expected)                                                                 | 0                                     | 8                                                                                                                                                                                                            |
+| GitHub constraints present (6 expected)                                                             | 0                                     | 6                                                                                                                                                                                                            |
+| `candidate_ai_insights_github_evidence_idx`                                                         | 0                                     | 1                                                                                                                                                                                                            |
+| RLS enabled on candidates / candidate_ai_insights / applications                                    | true / true / true                    | true / true / true                                                                                                                                                                                           |
+| Policies on candidates / candidate_ai_insights                                                      | 1 / 1                                 | 1 / 1                                                                                                                                                                                                        |
+| Every row count and stage/status mix                                                                | as above                              | identical                                                                                                                                                                                                    |
+| `candidates_integrity_hash` (ids, CV keys, CV consent flag/at/by/source, GitHub-URL presence, size) | `7b20a446…`                           | identical                                                                                                                                                                                                    |
+| `applications_integrity_hash`, `jobs_integrity_hash`, `insights_integrity_hash`                     | `56fdec28…`, `a20a3223…`, `6e1482fd…` | identical                                                                                                                                                                                                    |
+| New-column defaults on existing rows                                                                | —                                     | 0 candidates GitHub-authorized, all GitHub consent fields null on both candidates, `evidence_sources = '{}'` on the one insight row, GitHub fields null                                                      |
+| Schema fingerprint                                                                                  | —                                     | hosted `3d9d0a67f3de8eead19523ba969c5455` = local `pnpm db:fingerprint` `3d9d0a67f3de8eead19523ba969c5455` (objects 264, columns 107, policies 16, functions 10, triggers 13, auth triggers 2, RLS tables 9) |
+
+CV authorization behaviour is untouched: the consent columns, their values and the `candidates` policy are unchanged; the new GitHub authorization is false for every existing candidate.
+
+**Not done (per instruction, stop here):** the live GitHub analysis (T45). Still required before it: GitHub authorization recorded on a candidate with a profile URL, and optionally `GITHUB_TOKEN`. CI for commit 568471f was in progress at the time of writing.

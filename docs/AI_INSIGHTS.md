@@ -153,7 +153,7 @@ readiness; see `docs/DAILY_LOG.md` for recorded results.
 
 ## 8. GitHub profile evidence (contract `job-match-v2`, ADR-038)
 
-**Status:** In progress (implementation, local only). Extends the job-match workflow with public
+**Status:** Implemented; migration 0008 applied to the hosted project 2026-10-21; live run with a real profile pending. Extends the job-match workflow with public
 GitHub evidence for candidates who provided a GitHub profile URL **and** whose recruiter recorded a
 separate, explicit authorization for it. CV behaviour is unchanged.
 
