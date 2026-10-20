@@ -22,6 +22,11 @@ on conflict (id) do update
       allowed_mime_types = excluded.allowed_mime_types;
 
 -- 2. Row level security on storage.objects, scoped to this bucket and the owning tenant.
+--    PostgreSQL has no "create policy if not exists", so each policy is dropped first; this
+--    makes the whole script idempotent and safe to re-run. `can_access_org` is SECURITY
+--    DEFINER and returns true for platform admins, so an admin can reach any tenant's CVs,
+--    consistent with their documented cross-tenant authority.
+drop policy if exists "candidate_cvs_select" on storage.objects;
 create policy "candidate_cvs_select"
   on storage.objects for select to authenticated
   using (
@@ -29,6 +34,7 @@ create policy "candidate_cvs_select"
     and public.can_access_org((storage.foldername(name))[1]::uuid)
   );
 
+drop policy if exists "candidate_cvs_insert" on storage.objects;
 create policy "candidate_cvs_insert"
   on storage.objects for insert to authenticated
   with check (
@@ -36,6 +42,7 @@ create policy "candidate_cvs_insert"
     and public.can_access_org((storage.foldername(name))[1]::uuid)
   );
 
+drop policy if exists "candidate_cvs_update" on storage.objects;
 create policy "candidate_cvs_update"
   on storage.objects for update to authenticated
   using (
@@ -47,6 +54,7 @@ create policy "candidate_cvs_update"
     and public.can_access_org((storage.foldername(name))[1]::uuid)
   );
 
+drop policy if exists "candidate_cvs_delete" on storage.objects;
 create policy "candidate_cvs_delete"
   on storage.objects for delete to authenticated
   using (

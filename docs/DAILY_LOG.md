@@ -846,3 +846,17 @@ The full build type-checks test files, which caught a `File`/`Uint8Array` typing
 **Unverified without hosted Storage:** live upload/view/replace/delete round-trips (no local Supabase/PostgREST); covered by the validation, action, database, emulated-storage and jsdom tests.
 
 **Requires the owner's separate approval (not done):** push migration `0005`; apply `supabase/storage/candidate-cvs.sql` (bucket + policies). No hosted writes, no real candidate files, no Auth changes, no deploy, no AI analysis in this phase.
+
+## 2026-10-21 (continued) — Read-only preflight and dry-run for the CV migration (nothing applied)
+
+**Request:** read-only hosted preflight and the documented migration dry-run for the candidate CV feature; do not apply migration 0005 or create the Storage bucket/policies.
+
+**Preflight (MCP `execute_sql`, read-only):** project `zcxmyaxpftzwpzvmhslm`; migration history is exactly the four applied versions (`initial_schema`, `rls_policies`, `membership_activation`, `privilege_hardening`); `candidates` has no `cv_*` columns yet and holds 1 row; `can_access_org` exists; the `storage` schema and `storage.foldername` exist, but there are **no buckets and no `storage.objects` policies**, so the `candidate-cvs` bucket and the `candidate_cvs_*` policy names do not conflict with anything.
+
+**Compatibility of migration 0005:** it is purely additive (`add column` / `add constraint`); it performs no `drop`, `update` or data change, so existing candidate, job, application, organization, membership and auth rows are untouched. The new columns are nullable except `cv_ai_authorized boolean not null default false`. The existing candidate (all CV fields absent) satisfies every new check: the all-or-nothing CV metadata check is satisfied by all-null, and the two consent checks are satisfied by `cv_ai_authorized = false` with null timestamps. The `ALTER` validates existing rows at apply time and will pass.
+
+**Dry-run:** `pnpm supabase:hosted list-remote` shows the four applied versions local = remote and `20261021120000` local-only; `pnpm supabase:hosted dry-run` reports exactly `Would push these migrations: • 20261021120000_candidate_cv.sql`, `seeds: []`, `roles: []`. Nothing applied.
+
+**Storage SQL review and fix:** `supabase/storage/candidate-cvs.sql` configures a private bucket (`public = false`, 10 MB, `application/pdf`) and four restrictive `storage.objects` policies scoped to the bucket and the tenant via `can_access_org` on the first path segment. The bucket upsert was already idempotent; the `create policy` statements were not, so a re-run would have failed. Fixed by preceding each with `drop policy if exists`. Verified locally against an emulated storage schema: the script parses, creates the private bucket, creates the four policies, and re-runs cleanly (still exactly four policies).
+
+**Blockers/warnings:** none. The only manual hosted steps, both needing explicit approval, are the migration push and applying the Storage SQL. No hosted write was performed.
