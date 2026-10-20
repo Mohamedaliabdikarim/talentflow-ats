@@ -22,14 +22,14 @@ describe("validateCvMetadata", () => {
     expect(validateCvMetadata({ name: "x.pdf", type: "application/pdf", size: 0 }).ok).toBe(false);
   });
 
-  it("rejects a file over the 10 MB limit", () => {
+  it("rejects a file over the 4 MB limit", () => {
     const result = validateCvMetadata({
       name: "big.pdf",
       type: "application/pdf",
       size: CV_MAX_BYTES + 1,
     });
     expect(result).toMatchObject({ ok: false });
-    if (!result.ok) expect(result.message).toMatch(/10 MB/);
+    if (!result.ok) expect(result.message).toMatch(/4 MB/);
   });
 
   it("rejects a non-PDF content type", () => {

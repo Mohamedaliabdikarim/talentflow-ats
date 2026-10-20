@@ -25,6 +25,8 @@
 
 `src/lib/env.ts` validates these at startup. `.env.example` lists names without values.
 
+**Request-body limits (ADR-041):** CV upload and CV extraction go through Server Actions with `experimental.serverActions.bodySizeLimit = 4400kb` in `next.config.ts`; the application accepts CVs up to 4 MB, under Vercel's 4.5 MB function request cap. Do not raise the body limit above the host's cap. Larger files would need direct-to-Storage uploads.
+
 **Build-time inlining (verified 2026-10-19):** Next.js replaces `process.env.NEXT_PUBLIC_*` with the values present when `next build` runs, in server and client bundles alike. An empty value in `.env.local` is baked in as an empty string and cannot be overridden by App Service settings. Consequences: (1) keep unset `NEXT_PUBLIC_*` lines commented out locally; (2) the GitHub Actions build job must receive the production `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `NEXT_PUBLIC_APP_URL` as repository variables; (3) server-only secrets (`SUPABASE_SERVICE_ROLE_KEY`, AI keys) stay runtime-only in App Service application settings.
 
 ## 3. Supabase configuration checklist

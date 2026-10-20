@@ -20,6 +20,7 @@ import {
   type ExtractedField,
 } from "@/lib/ai/candidate-extract-contract";
 import { NO_JOB_OPTION } from "@/lib/validation/candidate";
+import { CV_MAX_LABEL } from "@/lib/validation/cv";
 import { extractCandidateDetailsAction } from "@/server/actions/candidate-extract";
 import { createCandidateAction, updateCandidateAction } from "@/server/actions/candidates";
 import { FormError, SubmitButton, TextAreaField, TextField } from "./fields";
@@ -173,7 +174,7 @@ export function CandidateForm({
             </p>
           ) : (
             <p id="cv-hint" className="text-xs text-muted-foreground">
-              Candidate-provided PDF, max 10 MB. You can add a candidate without a CV.
+              Candidate-provided PDF, max {CV_MAX_LABEL}. You can add a candidate without a CV.
               {extractAction
                 ? " When you choose a PDF, its contact details are read automatically to prefill the form; you review and correct them before saving."
                 : ""}{" "}

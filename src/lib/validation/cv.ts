@@ -6,8 +6,15 @@
 
 export const CV_BUCKET = "candidate-cvs";
 export const CV_CONTENT_TYPE = "application/pdf";
-/** 10 MB. Documented limit; mirrored by candidates_cv_size_bytes_range and the bucket. */
-export const CV_MAX_BYTES = 10 * 1024 * 1024;
+/**
+ * 4 MB (ADR-041). CVs travel through Server Actions, whose request body is capped by
+ * `experimental.serverActions.bodySizeLimit` in next.config.ts and, on Vercel, by the platform's
+ * 4.5 MB request limit. The database check (`candidates_cv_size_bytes_range`) and the Storage
+ * bucket keep a 10 MB ceiling; this application limit is the stricter one and is what users see.
+ */
+export const CV_MAX_BYTES = 4 * 1024 * 1024;
+/** Human-readable form of CV_MAX_BYTES for hints and error messages. */
+export const CV_MAX_LABEL = "4 MB";
 /** "%PDF-" — the PDF file signature (magic bytes). */
 const PDF_SIGNATURE = [0x25, 0x50, 0x44, 0x46, 0x2d];
 
@@ -46,7 +53,7 @@ export function validateCvMetadata(file: {
   const size = file.size ?? 0;
   if (!size || size <= 0) return { ok: false, message: "The file is empty." };
   if (size > CV_MAX_BYTES) {
-    return { ok: false, message: "The file is larger than the 10 MB limit." };
+    return { ok: false, message: `The file is larger than the ${CV_MAX_LABEL} limit.` };
   }
   if ((file.type ?? "") !== CV_CONTENT_TYPE) {
     return { ok: false, message: "Only PDF files are accepted." };

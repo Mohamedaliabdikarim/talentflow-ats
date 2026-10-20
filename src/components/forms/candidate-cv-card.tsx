@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { idleState } from "@/lib/action-state";
+import { CV_MAX_LABEL } from "@/lib/validation/cv";
 import { formatDateTime } from "@/components/page-header";
 import { SubmitButton } from "@/components/forms/fields";
 import {
@@ -179,7 +180,7 @@ export function CandidateCvCard({ base, orgSlug, candidateId, cv, consent }: Pro
       ) : (
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            No CV uploaded yet. Add a candidate-provided PDF (max 10 MB).
+            No CV uploaded yet. Add a candidate-provided PDF (max {CV_MAX_LABEL}).
           </p>
           <form action={upload} className="flex flex-wrap items-center gap-2">
             <Label htmlFor={fileInputId} className="sr-only">

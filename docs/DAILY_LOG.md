@@ -1159,3 +1159,23 @@ Docs: ADR-039, `docs/AI_INSIGHTS.md` §9, `docs/SECURITY.md` §9 addendum, `docs
 **Limitations:** the last-owner rule is enforced server-side with conditional writes, not inside one database transaction, so two admins demoting two different owners at the same instant could leave none (acceptable for an admin-only operation; a SECURITY DEFINER function is the follow-up if needed). Live admin test of role change / deactivate / reactivate pending the owner (T49 covers logic, not the hosted round-trip). Committed locally only; not pushed.
 
 Docs: ADR-040, `docs/SECURITY.md` §4 table, `docs/TEST_PLAN.md` T49–T50, `docs/PRD.md` R02, `CLAUDE.md` roles convention.
+
+## 2026-10-21 (continued) — Pre-deployment: CV size limit aligned with the Server Action body limit and Vercel's request cap (ADR-041)
+
+**Finding (security audit, 2026-10-21):** Next.js caps Server Action request bodies at 1 MB by default, while the UI promised a 10 MB CV; any CV above 1 MB failed with a generic error, locally as well. Vercel, the chosen host, caps function request bodies at 4.5 MB.
+
+**Change:** `CV_MAX_BYTES` is now 4 MB with a shared label `CV_MAX_LABEL` that the hints and error messages derive from; `experimental.serverActions.bodySizeLimit = "4400kb"` in `next.config.ts` (room for multipart overhead, under 4.5 MB). The database check and the Storage bucket keep their 10 MB ceiling, so there is no migration and no hosted change. The Add candidate hint and the CV card hint now say 4 MB; the extraction action inherits the message.
+
+**Tests:** `tests/unit/upload-limits.test.ts` (limit is 4 MB; a file exactly at the limit is accepted and one byte more rejected with the labelled message; the old 10 MB size is rejected; the body limit is explicit, fits a CV at the limit plus 64 KB of form overhead, and stays under 4.5 MB); `tests/unit/cv-validation.test.ts` retargeted to 4 MB.
+
+**Commands and results (this machine):**
+
+| Command          | Result                                                             |
+| ---------------- | ------------------------------------------------------------------ |
+| `pnpm typecheck` | pass                                                               |
+| `pnpm lint`      | 0 errors (7 pre-existing warnings)                                 |
+| `pnpm test`      | 39 files, **374/374**                                              |
+| `pnpm db:verify` | 9 files, **90/90** (no schema change)                              |
+| `pnpm build`     | pass; `serverActions` listed among the experimental options in use |
+
+Docs: ADR-041, `docs/SECURITY.md` §9, `docs/DEPLOYMENT.md` §2. Pushed together with 94964e9 (membership management); CI result recorded in the final report of this session.

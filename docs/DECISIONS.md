@@ -524,3 +524,16 @@ Chronological architecture decision records. Statuses: Proposed | Approved | Imp
 - Implementation reference: `src/server/actions/memberships.ts`, `src/lib/validation/admin.ts`, `src/components/forms/membership-controls.tsx`, `src/components/views/members-table.tsx`, `src/app/admin/organizations/[organizationId]/page.tsx`, `src/server/audit.ts`; tests `tests/unit/membership-actions.test.ts`, `tests/unit/membership-controls.test.tsx`, `tests/db/membership-management.test.ts`.
 - Verification evidence: `docs/DAILY_LOG.md` (2026-10-21, membership management) and `docs/TEST_PLAN.md` T49–T50.
 - Status: Implemented locally (no migration; works against the hosted schema as is); live admin test pending the owner
+
+### ADR-041 — CV size limit 4 MB, aligned with the Server Action body limit and Vercel's request cap
+
+- Date: 2026-10-21
+- Context / problem: CV upload and CV extraction send the PDF through Server Actions. Next.js caps a Server Action request body at 1 MB by default, so any CV above 1 MB failed with a generic error while the UI promised 10 MB; Vercel, the chosen host, caps function request bodies at 4.5 MB.
+- Decision: the application limit becomes **4 MB** (`CV_MAX_BYTES`, label `CV_MAX_LABEL`), the hints and error messages derive from it, and `experimental.serverActions.bodySizeLimit` is set to `4400kb`: enough for a 4 MB file plus multipart overhead, under 4.5 MB. The database check and the Storage bucket keep their 10 MB ceiling (no migration, no hosted change); the application limit is the stricter one. `tests/unit/upload-limits.test.ts` keeps the three values consistent.
+- Options considered: (a) raise the body limit to 10 MB — rejected: exceeds Vercel's cap; (b) upload directly from the browser to Storage with a signed URL — the right long-term answer for larger files, deferred: more surface (signed upload URLs, client-side validation) days before the deadline.
+- Why this approach: smallest change that makes the promised limit true on every host and in local development.
+- Trade-offs / risks: CVs above 4 MB are refused with a clear message; most text CVs are well under 1 MB. If larger files become a need, implement direct-to-Storage uploads.
+- Security and privacy implications: none new; validation order (type, size, signature) unchanged.
+- Implementation reference: `src/lib/validation/cv.ts`, `next.config.ts`, `src/components/forms/candidate-form.tsx`, `src/components/forms/candidate-cv-card.tsx`, `tests/unit/upload-limits.test.ts`, `tests/unit/cv-validation.test.ts`.
+- Verification evidence: `docs/DAILY_LOG.md` (2026-10-21, upload limits).
+- Status: Implemented locally
