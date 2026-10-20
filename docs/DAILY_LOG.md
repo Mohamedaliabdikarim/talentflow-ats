@@ -938,3 +938,11 @@ exit=0
 **Verification:** `pnpm test` 174/174 (18 files), `pnpm db:verify` 63/63, `pnpm lint`/`pnpm typecheck` pass, `pnpm build` ok, `pnpm test:e2e` 45 passed / 55 skipped.
 
 **Read-only hosted check (requirement):** the failed submission created nothing — candidates total 1 (Alex Morgan intact, no CV), 0 synthetic test candidates, 0 `candidate-cvs` objects; jobs, applications and memberships unchanged. The validation error occurred before any insert, so there is no orphan candidate or Storage object to clean up. No hosted data was created, modified or deleted.
+
+## 2026-10-21 (continued) — CV end-to-end test: read-only hosted verification + stale-message fix
+
+**Read-only hosted verification (after the owner's manual browser test, nothing written):** the synthetic candidate is gone (0 test candidates, candidates total 1); the `candidate-cvs` bucket holds 0 objects (no orphans from replace or delete); Alex Morgan is intact with no CV; baseline counts restored (candidates 1, jobs 1, applications 1, organizations 1, memberships 1, auth users 2); 5 migrations and the four `candidate_cvs_*` policies unchanged, bucket still private. The CV audit trail is exactly the expected five events in order (uploaded → replaced → ai_authorized → ai_revoked → deleted), all org-scoped, targeting a candidate, ids only. No unexpected records, no errors, no residual CV or candidate data. The audit events are an immutable log of the test actions and should be kept (they contain no private data).
+
+**UI fix (stale success message):** after deleting a CV, the green "CV replaced." note from the earlier replace stayed visible over the "No CV uploaded yet." empty state, because the upload action's `useActionState` success persists across the re-render that sets the CV to null. Fixed in `CandidateCvCard` by gating each action's success note to the card's current state: the upload note shows only while a CV is present, and the delete note only while none is. Regression test added in `tests/unit/candidate-cv-card.test.tsx` (submit the replace form → "CV replaced." shows; re-render with `cv=null` → the note is gone and the empty state shows).
+
+**Verification:** `pnpm test` 175/175 (18 files), `pnpm lint`/`pnpm typecheck` pass, `pnpm build` ok. No hosted writes.

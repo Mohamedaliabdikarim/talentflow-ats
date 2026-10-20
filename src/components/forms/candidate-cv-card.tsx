@@ -76,7 +76,9 @@ export function CandidateCvCard({ base, orgSlug, candidateId, cv, consent }: Pro
           <AlertDescription>{uploadState.message}</AlertDescription>
         </Alert>
       ) : null}
-      {uploadState.status === "success" ? (
+      {/* Gate each action's success note to the card's current state, so a stale "CV
+          replaced." cannot linger after a later delete (and vice versa). */}
+      {uploadState.status === "success" && cv ? (
         <p className="text-xs text-emerald-400" role="status">
           {uploadState.message}
         </p>
@@ -85,6 +87,11 @@ export function CandidateCvCard({ base, orgSlug, candidateId, cv, consent }: Pro
         <Alert variant="destructive" role="alert">
           <AlertDescription>{deleteState.message}</AlertDescription>
         </Alert>
+      ) : null}
+      {deleteState.status === "success" && !cv ? (
+        <p className="text-xs text-emerald-400" role="status">
+          {deleteState.message}
+        </p>
       ) : null}
 
       {cv ? (

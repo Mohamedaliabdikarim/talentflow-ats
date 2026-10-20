@@ -1,16 +1,24 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ActionState } from "@/lib/action-state";
 
 /** CV card UI states (ADR-033): empty vs present, actions, and consent never pre-checked. */
 
 vi.mock("@/server/actions/candidate-cv", () => ({
-  uploadCandidateCvAction: vi.fn(async () => ({ status: "idle" })),
-  deleteCandidateCvAction: vi.fn(async () => ({ status: "idle" })),
-  authorizeCandidateCvAiAction: vi.fn(async () => ({ status: "idle" })),
-  revokeCandidateCvAiAction: vi.fn(async () => ({ status: "idle" })),
+  uploadCandidateCvAction: vi.fn(async (): Promise<ActionState> => ({ status: "idle" })),
+  deleteCandidateCvAction: vi.fn(async (): Promise<ActionState> => ({ status: "idle" })),
+  authorizeCandidateCvAiAction: vi.fn(async (): Promise<ActionState> => ({ status: "idle" })),
+  revokeCandidateCvAiAction: vi.fn(async (): Promise<ActionState> => ({ status: "idle" })),
 }));
+
+const PRESENT_CV = {
+  filename: "alex-cv.pdf",
+  sizeBytes: 2048,
+  uploadedAt: "2026-10-20T09:00:00Z",
+  source: "candidate_provided_recruiter_upload",
+};
 vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) =>
     createElement("a", { href, ...rest }, children),
@@ -93,5 +101,42 @@ describe("CandidateCvCard", () => {
     expect(screen.getByText(/candidate emailed written consent/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Revoke authorization" })).toBeTruthy();
     expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
+  it("does not keep a stale upload success note after the CV is deleted", async () => {
+    const actions = await import("@/server/actions/candidate-cv");
+    vi.mocked(actions.uploadCandidateCvAction).mockResolvedValueOnce({
+      status: "success",
+      message: "CV replaced.",
+      data: undefined,
+    });
+
+    const { rerender } = render(
+      <CandidateCvCard
+        base="/o/acme"
+        orgSlug="acme"
+        candidateId="c1"
+        cv={PRESENT_CV}
+        consent={NO_CONSENT}
+      />,
+    );
+    const replaceForm = screen
+      .getByLabelText("Replace the CV with another PDF")
+      .closest("form") as HTMLFormElement;
+    fireEvent.submit(replaceForm);
+    expect(await screen.findByText("CV replaced.")).toBeTruthy();
+
+    // Deleting the CV re-renders the card with cv=null (revalidation); the note must clear.
+    rerender(
+      <CandidateCvCard
+        base="/o/acme"
+        orgSlug="acme"
+        candidateId="c1"
+        cv={null}
+        consent={NO_CONSENT}
+      />,
+    );
+    expect(screen.queryByText("CV replaced.")).toBeNull();
+    expect(screen.getByText(/No CV uploaded yet/)).toBeTruthy();
   });
 });
