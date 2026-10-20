@@ -110,7 +110,7 @@ File: `supabase/migrations/20261019140000_privilege_hardening.sql` (reviewed in 
 
 ## 7. Bootstrap of the first platform admin (after migrations)
 
-`pnpm bootstrap:admin --email <admin-email> --name "<name>" --project-ref zcxmyaxpftzwpzvmhslm` creates the auth user with the service-role key from `.env.local`, inserts the `platform_admins` row, writes an `admin.bootstrapped` audit row, and prints the one-time invitation link **once** to the operator's terminal. The operator opens it (or shares it privately), sets a password, and lands on `/admin`. This creates a hosted user, so it waits for approval.
+`pnpm bootstrap:admin --email <admin-email> --name "<name>" --project-ref zcxmyaxpftzwpzvmhslm` is a **dry run** (reads only: existing admins and users). With `--apply` it creates the auth user with the service-role key from `.env.local`, upserts the `platform_admins` row, writes an `admin.bootstrapped` audit row (ids only), and prints the one-time link **once**, or writes it to `--link-file <path>` (mode 0600) while logging a redacted form. It refuses when another admin exists (`--allow-existing` overrides); an existing account gets a magic link; both link types end on `/auth/set-password`. The operator opens the link with the app running on `NEXT_PUBLIC_APP_URL`, sets a password and lands on `/admin`. Full plan, exact row changes, rollback and the approval checklist: `docs/BOOTSTRAP_ADMIN_PLAN.md`. Creating the hosted user waits for approval; `pnpm env:check bootstrap` lists the required variables by name.
 
 ## 8. Invitation links — operational limitations (approved MVP design)
 

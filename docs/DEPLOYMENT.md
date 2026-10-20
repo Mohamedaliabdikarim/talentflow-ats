@@ -32,7 +32,7 @@
 2. Authentication → URL configuration: Site URL = `https://<app>.azurewebsites.net`; Redirect URLs include `https://<app>.azurewebsites.net/auth/callback` and `http://localhost:3000/auth/callback`.
 3. Authentication → Email: enable email provider; disable public sign-ups (users are invited); set minimum password length to 10.
 4. Apply migrations: `pnpm supabase:hosted link`, `list-remote`, `dry-run`, then `push` with explicit approval (`docs/SUPABASE_INTEGRATION.md` §6). Done for migrations 0001–0003 on 2026-10-19.
-5. Create the first platform admin: `pnpm bootstrap:admin --email <demo-admin-email> --name "<name>" --project-ref <ref>` locally with the service-role key in `.env.local` (requires approval; see `docs/SUPABASE_INTEGRATION.md` §7). Credentials are shared privately.
+5. Create the first platform admin: `pnpm bootstrap:admin --email <demo-admin-email> --name "<name>" --project-ref <ref>` (dry run), then the same with `--apply --link-file <path>` locally with the service-role key in `.env.local` (requires approval; procedure and rollback in `docs/BOOTSTRAP_ADMIN_PLAN.md`). Credentials are shared privately.
 
 ## 4. Azure App Service steps (planned)
 

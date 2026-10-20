@@ -22,20 +22,21 @@ Multi-tenant applicant tracking system. Next.js 16 (App Router, React 19, strict
 
 ## Commands
 
-| Command                                                   | Purpose                                                                                   |
-| --------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `pnpm dev`                                                | Local dev server (needs Supabase keys in `.env.local`)                                    |
-| `pnpm lint` / `pnpm typecheck`                            | ESLint / `tsc --noEmit`                                                                   |
-| `pnpm test`                                               | Vitest unit tests (Node environment; component tests opt into jsdom per file)             |
-| `pnpm db:verify`                                          | Embedded PostgreSQL: apply shim + migrations, run `tests/db`                              |
-| `TALENTFLOW_DB_HOSTED_LIKE=1 pnpm db:verify`              | Same suite on the measured hosted default privileges plus `supabase/proposed/*.sql`       |
-| `pnpm db:types`                                           | Regenerate `src/lib/supabase/database.types.ts` from the migrations                       |
-| `pnpm db:fingerprint`                                     | Hash of the local schema; compare with the same query run read-only on the hosted project |
-| `pnpm build` / `pnpm start`                               | Standalone production build / run it                                                      |
-| `pnpm test:e2e`                                           | Playwright against the standalone build (`pnpm exec playwright install chromium` once)    |
-| `pnpm check`                                              | lint + typecheck + test + db:verify + build                                               |
-| `pnpm supabase:hosted <link\|list-remote\|dry-run\|push>` | Hosted migrations via the CLI; `push` only with approval                                  |
-| `pnpm bootstrap:admin --email … --project-ref …`          | First platform admin on the hosted project; only with approval                            |
+| Command                                                   | Purpose                                                                                              |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `pnpm dev`                                                | Local dev server (needs Supabase keys in `.env.local`)                                               |
+| `pnpm lint` / `pnpm typecheck`                            | ESLint / `tsc --noEmit`                                                                              |
+| `pnpm test`                                               | Vitest unit tests (Node environment; component tests opt into jsdom per file)                        |
+| `pnpm db:verify`                                          | Embedded PostgreSQL: apply shim + migrations, run `tests/db`                                         |
+| `TALENTFLOW_DB_HOSTED_LIKE=1 pnpm db:verify`              | Same suite on the measured hosted default privileges plus `supabase/proposed/*.sql`                  |
+| `pnpm db:types`                                           | Regenerate `src/lib/supabase/database.types.ts` from the migrations                                  |
+| `pnpm db:fingerprint`                                     | Hash of the local schema; compare with the same query run read-only on the hosted project            |
+| `pnpm build` / `pnpm start`                               | Standalone production build / run it                                                                 |
+| `pnpm test:e2e`                                           | Playwright against the standalone build (`pnpm exec playwright install chromium` once)               |
+| `pnpm check`                                              | lint + typecheck + test + db:verify + build                                                          |
+| `pnpm supabase:hosted <link\|list-remote\|dry-run\|push>` | Hosted migrations via the CLI; `push` only with approval                                             |
+| `pnpm bootstrap:admin --email … --project-ref …`          | First platform admin: dry run by default; `--apply` (and `--link-file`) only with approval           |
+| `pnpm env:check [bootstrap]`                              | Which `.env.local` names are set (never values) and whether an operation's prerequisites are present |
 
 ## Code conventions
 

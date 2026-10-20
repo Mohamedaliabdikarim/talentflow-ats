@@ -534,3 +534,32 @@ Nothing unexpected occurred.
 **Docs updated:** `docs/PRIVILEGE_HARDENING_REVIEW.md` (status: applied; §9 record), `docs/TEST_PLAN.md` (T30 verified on hosted; execution record), `docs/SECURITY.md` §8, `docs/SUPABASE_INTEGRATION.md`, `docs/DATABASE.md`, `docs/HOSTED_MIGRATION_DRY_RUN.md` §9, `docs/DECISIONS.md` ADR-026, `CLAUDE.md`.
 
 **Verified vs pending:** migration 0004 applied and verified on the hosted project. Not done, awaiting separate approvals: `pnpm bootstrap:admin` (first hosted user; first real run of the `auth.users` → `profiles` trigger), hosted Authentication settings, deployment, AI integration.
+
+## 2026-10-20 (continued) — First platform admin: review, hardening and rehearsal (nothing executed)
+
+**Request:** review `pnpm bootstrap:admin` and its safeguards, verify the required Auth settings and environment variables, explain exactly what the first admin changes in `auth.users`, `profiles`, `platform_admins` and the audit log, verify the trigger and the flow against the current schema, prepare a safe procedure with secure credential entry and rollback, run local tests; no admin created, no hosted auth change, no deployment, no AI. Plan for the owner: `docs/BOOTSTRAP_ADMIN_PLAN.md`.
+
+**Review findings on the previous script and the fixes (all local code):** it executed immediately (now dry-run by default, `--apply` required); it did not refuse when a platform admin already existed (now refuses unless the email is that admin's or `--allow-existing` is given); an audit failure was only a warning (now fatal with the user id and re-run guidance); the magic-link path for an existing account went to `/app`, which after an expired invitation would have skipped the password step (now both link types end on `/auth/set-password`); no email/name validation (now Zod: email format, name ≤160, ref pattern); the link could only be printed (now `--link-file <path>` writes it with mode 0600 and the log shows `token_hash=[redacted]`, so the token never enters terminal scrollback or this conversation). The script is now importable (`bootstrapAdmin(options, client, log)`) and runs `main()` only when invoked directly. `pnpm env:check bootstrap` is a new profile that requires `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL` and the publishable key in addition to the URL and ref.
+
+**Environment:** `pnpm env:check bootstrap` → `missing SUPABASE_SERVICE_ROLE_KEY` (names only). Everything else needed is present. The key is entered by the owner through `pnpm env:set` (hidden prompt) or, with approval, fetched through the Management API and piped into `.env.local` unseen (plan §4 step 1).
+
+**Hosted Auth settings:** a read-only `GET /v1/projects/<ref>/config/auth` with the scoped token answered `403 Missing required permission(s): auth_config_read`, so the values could not be verified. Analysis in the plan §2: at defaults nothing blocks the bootstrap (the admin API invites regardless of the sign-up switch; `/auth/confirm` exchanges the token hash directly, so Site URL and redirect lists are not involved; no email is sent). Recommended before deployment, as separate owner decisions: sign-ups off, minimum password length 10, Site URL and redirects for Azure.
+
+**What `--apply` changes (plan §3):** one `auth.users` row (GoTrue, unconfirmed until the link is used), one `profiles` row (trigger, email + full name), one `platform_admins` row (`granted_by` NULL, note "bootstrap script"), one `admin.bootstrapped` audit row with ids only. Nothing else.
+
+**Rehearsal against the current schema:** `tests/db/bootstrap-admin.test.ts` (7 cases, isolated database with migrations 0001–0004) reproduces the GoTrue insert as `supabase_auth_admin`, the `service_role` upsert and audit insert, the admin acting as `authenticated` (`is_platform_admin()` true, zero memberships activated, sees the admin row), a non-admin (not recognised, sees nothing, cannot insert → 42501), an email change propagating to `profiles`, and the rollback (deleting the auth user cascades `profiles` and `platform_admins`; the audit row keeps a NULL actor). `tests/unit/bootstrap-admin.test.ts` (10 cases, fake service-role client) pins the guards, the dry run, the apply sequence (invite → upsert → audit → link printed once, ids-only metadata), the magic-link fallback, the loud failures and `--link-file`.
+
+**Tests run and exact results:**
+
+| Command                                      | Result                                                     |
+| -------------------------------------------- | ---------------------------------------------------------- |
+| `pnpm test`                                  | 109 passed / 109 (10 files)                                |
+| `pnpm db:verify`                             | 48 passed / 48 (5 files)                                   |
+| `TALENTFLOW_DB_HOSTED_LIKE=1 pnpm db:verify` | 48 passed / 48                                             |
+| `pnpm lint` / `pnpm typecheck`               | Pass                                                       |
+| `pnpm env:check bootstrap`                   | incomplete: `SUPABASE_SERVICE_ROLE_KEY` missing (expected) |
+| `pnpm bootstrap:admin` (no arguments)        | usage error, exit 1, no network call                       |
+
+One test-authoring slip was fixed before recording: the audit insert used `$1` as both uuid and text ("inconsistent types deduced for parameter $1"); explicit casts fixed the test, not the schema.
+
+**Verified vs pending:** script and database flow verified locally; the hosted bootstrap waits for the owner's choices in `docs/BOOTSTRAP_ADMIN_PLAN.md` §7 (key entry, dry run, then `--apply`). Not done: hosted user, hosted auth settings, deployment, AI integration.
