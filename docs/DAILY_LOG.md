@@ -946,3 +946,23 @@ exit=0
 **UI fix (stale success message):** after deleting a CV, the green "CV replaced." note from the earlier replace stayed visible over the "No CV uploaded yet." empty state, because the upload action's `useActionState` success persists across the re-render that sets the CV to null. Fixed in `CandidateCvCard` by gating each action's success note to the card's current state: the upload note shows only while a CV is present, and the delete note only while none is. Regression test added in `tests/unit/candidate-cv-card.test.tsx` (submit the replace form → "CV replaced." shows; re-render with `cv=null` → the note is gone and the empty state shows).
 
 **Verification:** `pnpm test` 175/175 (18 files), `pnpm lint`/`pnpm typecheck` pass, `pnpm build` ok. No hosted writes.
+
+## 2026-10-21 (continued) — Azure OpenAI integration (transport only; no Candidate Insights)
+
+**Request:** wire and verify a reusable server-only Azure OpenAI client using the official `openai` SDK against the Azure v1 endpoint and the Responses API; no insights feature yet.
+
+**Implemented:**
+
+- `src/lib/ai/client.ts` (`server-only`): the `openai` SDK's `OpenAI` client pointed at `<AZURE_OPENAI_ENDPOINT>/openai/v1/` with `apiKey = AZURE_OPENAI_API_KEY`, calling `responses.create({ model: <deployment>, input })`. Credentials come only from `getServerEnv()`; `getAzureOpenAIConfig()` throws a clear, value-free error naming any missing variable; `buildAzureBaseUrl()` normalises the endpoint; 60 s timeout, SDK retries, and a typed `AiError` map auth/rate-limit/timeout/connection/server errors to safe messages. Nothing logs the key or request content.
+- `scripts/ai/smoke.ts` + `pnpm ai:smoke`: a local connectivity probe (synthetic prompt) that prints only the model, latency, token usage and the probe response. Run with `--conditions=react-server` so the `server-only` marker resolves to its no-op under tsx.
+- `src/lib/env.ts`: added the optional `AZURE_OPENAI_API_VERSION`; `.env.example` documents it.
+
+**Dependency added:** `openai@^7.39.0` (the only new package).
+
+**Azure smoke test: PASS.** `gpt-5-mini` responded in ~2 s and returned the expected probe token (152 output tokens). The v1 endpoint with the SDK's bearer-key auth works; no api-version query was needed.
+
+**No secret leakage (verified):** a scan of `.next/static` found zero occurrences of the API key value and zero of the name `AZURE_OPENAI_API_KEY`; the key is a non-public env var read only on the server behind the `server-only` guard.
+
+**Checks:** `pnpm test` 182/182 (adds `tests/unit/ai-client.test.ts`: base-URL normalisation, missing-config error, error mapping); `pnpm db:verify` 63/63; `pnpm lint` (5 pre-existing warnings, 0 errors) / `pnpm typecheck` pass; `pnpm build` ok. No candidate workflow, migration, RLS, CV permission or AI-consent rule was touched.
+
+**Remaining before Candidate Insights:** the data-processing/retention design and the consent-recheck/revocation wiring (ADR-035+ in the proposal), and the two output contracts; all gated on the owner's approval. `ai:smoke` calls the paid API and is intentionally excluded from CI.

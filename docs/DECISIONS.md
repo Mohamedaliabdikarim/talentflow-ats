@@ -433,3 +433,16 @@ Chronological architecture decision records. Statuses: Proposed | Approved | Imp
 - Implementation reference: `supabase/migrations/20261021120000_candidate_cv.sql`, `supabase/storage/candidate-cvs.sql`, `src/lib/validation/cv.ts`, `src/server/actions/candidate-cv.ts`, `src/app/o/[orgSlug]/candidates/[candidateId]/cv/route.ts`, `src/components/forms/candidate-cv-card.tsx`, the create-form and detail-page wiring.
 - Verification evidence: `tests/unit/cv-validation.test.ts`, `tests/unit/candidate-cv-actions.test.ts`, `tests/unit/candidate-cv-card.test.tsx`, `tests/db/candidate-cv.test.ts`; `pnpm check` + E2E green 2026-10-21 (`docs/DAILY_LOG.md`).
 - Status: Implemented locally; hosted migration push and Storage bucket/policy creation await the owner's approval
+
+### ADR-034 — Azure OpenAI integration: server-only client over the v1 Responses API
+
+- Date: 2026-10-21
+- Context / problem: Candidate Insights (ADR-035+, not implemented) needs an LLM. Azure AI Foundry is provisioned with a `gpt-5-mini` deployment and an OpenAI-compatible `/openai/v1/` endpoint. This phase wires and verifies only the transport, with no insights logic.
+- Decision: use the official `openai` npm SDK's `OpenAI` client pointed at `<AZURE_OPENAI_ENDPOINT>/openai/v1/` with `apiKey = AZURE_OPENAI_API_KEY`, calling the Responses API (`responses.create`, `model = AZURE_OPENAI_DEPLOYMENT`). The client lives in `src/lib/ai/client.ts`, marked `server-only`; credentials are read through `getServerEnv()` (never `NEXT_PUBLIC_`), so the key cannot reach a client bundle (verified: 0 occurrences in `.next/static`). Errors, timeouts (60 s) and rate limits (SDK retries plus a typed `AiError` with safe messages) are handled; no key or request content is ever logged. A local script `pnpm ai:smoke` verifies connectivity with a synthetic prompt.
+- Options considered: (a) `AzureOpenAI` client with the classic `deployments/…?api-version=` routing — a Microsoft Q&A reports issues against the v1 URL; (b) the standard `OpenAI` client with `baseURL` at the v1 endpoint — the pattern current Azure docs use, chosen. `AZURE_OPENAI_API_VERSION` is supported but optional (the v1 endpoint does not require it).
+- Why this approach: one small, reusable, testable transport that matches Azure's current guidance; the `server-only` guard plus non-public env vars keep the key off the client; connectivity is provable locally without a public endpoint.
+- Trade-offs / risks: the local smoke test (`ai:smoke`) needs the `--conditions=react-server` flag so the `server-only` marker resolves to its no-op under tsx; it is not run in CI (it would call the paid API). Provider data-processing/retention design is a later gate (ADR to come) before any candidate content is sent.
+- Security and privacy implications: key server-only, never logged or bundled; the smoke prompt is synthetic; no candidate data flows yet.
+- Implementation reference: `src/lib/ai/client.ts`, `scripts/ai/smoke.ts`, `src/lib/env.ts` (`AZURE_OPENAI_API_VERSION`), `tests/unit/ai-client.test.ts`.
+- Verification evidence: `pnpm ai:smoke` returned the probe token from `gpt-5-mini` (~2 s); `pnpm test` 182/182; lint, typecheck, build pass; key absent from `.next/static` (`docs/DAILY_LOG.md`, 2026-10-21).
+- Status: Implemented (integration only); Candidate Insights not implemented

@@ -20,7 +20,8 @@
     "supabase:hosted": "node --env-file=.env.local scripts/db/hosted.mjs",
     "env:set": "node scripts/env/set-local.mjs",
     "env:check": "node scripts/env/check-local.mjs",
-    "db:fingerprint": "tsx scripts/db/schema-fingerprint.ts"
+    "db:fingerprint": "tsx scripts/db/schema-fingerprint.ts",
+    "ai:smoke": "node --conditions=react-server --env-file=.env.local --import tsx scripts/ai/smoke.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -32,6 +33,7 @@
     "motion": "^14.4.0",
     "next": "16.4.2",
     "next-themes": "^0.4.6",
+    "openai": "^7.39.0",
     "radix-ui": "^1.8.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",

@@ -20,6 +20,8 @@ const serverEnvSchema = publicEnvSchema.extend({
   AZURE_OPENAI_ENDPOINT: z.url().optional(),
   AZURE_OPENAI_API_KEY: z.string().min(1).optional(),
   AZURE_OPENAI_DEPLOYMENT: z.string().min(1).optional(),
+  // Optional: only needed if the Azure v1 endpoint requires an explicit api-version query.
+  AZURE_OPENAI_API_VERSION: z.string().min(1).optional(),
   GITHUB_TOKEN: z.string().min(1).optional(),
 });
 
@@ -50,6 +52,7 @@ export function getServerEnv(): ServerEnv {
     AZURE_OPENAI_ENDPOINT: emptyToUndefined(process.env.AZURE_OPENAI_ENDPOINT),
     AZURE_OPENAI_API_KEY: emptyToUndefined(process.env.AZURE_OPENAI_API_KEY),
     AZURE_OPENAI_DEPLOYMENT: emptyToUndefined(process.env.AZURE_OPENAI_DEPLOYMENT),
+    AZURE_OPENAI_API_VERSION: emptyToUndefined(process.env.AZURE_OPENAI_API_VERSION),
     GITHUB_TOKEN: emptyToUndefined(process.env.GITHUB_TOKEN),
   });
 }
