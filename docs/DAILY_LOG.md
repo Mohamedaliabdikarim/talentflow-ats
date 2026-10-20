@@ -790,3 +790,28 @@ Skips are deliberate: opt-in screenshot captures (`SCREENSHOTS=1`) and the singl
 **Remaining risks:** the real PostgREST query path of `listPipelineCards`/`listCandidates` is not integration-tested locally (needs a running Supabase/PostgREST; none in the harness); it is covered by the DB logic tests, the preview browser tests, and the owner's manual hosted end-to-end. No stage-transition history exists yet.
 
 **Boundaries honoured:** hosted checks were read-only; no hosted data created, edited or deleted; no invitations, Auth changes, password resets or deploys; no AI or redesign; automated tests use synthetic data only. The core ATS workflow (auth, provisioning, invite/resend, jobs, candidates, applications, Kanban with job + name filtering, tenant isolation, audit) is implemented, verified and tested — ready for a premium UI/design pass.
+
+## 2026-10-20 (continued) — Premium navy redesign of the customer workspace (ADR-032)
+
+**Request:** upgrade the authenticated customer workspace to the landing page's premium navy design language, preserving every workflow; keep the admin area and landing intact; no data/RLS/auth/route changes; verify and screenshot.
+
+**Approach:** a scoped `.app` navy token set (derived from `.landing`, cards one step above the canvas) applied by `AppShell theme="app"` to the real and preview workspace layouts only. Shared components were polished with token-based classes so they adapt per theme scope; the admin area stays on the light theme and the landing is unchanged.
+
+**Changed (presentation only):** `globals.css` (`.app` tokens + sidebar/brand/aurora helpers), `AppShell` (gradient brand tile, 64px sidebar with soft wash, sticky blurred top bar, centered `max-w-6xl` content, `theme` prop), `NavLink` (active leading bar + accent fill + primary icon), `page-header`/`StatCard`/`EmptyState` (dividers, elevated hover cards, refined empty panels), `kanban-board` (rounded navy columns, per-stage accent icons, count pills, card hover/drag states), `stage-badge` (`stageAccentClass`), `workspace-overview` (static accent wash). No server action, route, data access or RLS touched.
+
+**Visual review (preview, synthetic data):** confirmed the rendered dashboard (navy, gradient brand, elevated stat cards), pipeline (navy columns, sky/violet/amber stage accents, polished cards, filters in a card), candidates table (clean navy, accent profile links), mobile dashboard (sheet nav, stacked cards), and the landing page (intact; showcase now shares the refined Kanban). Screenshots refreshed in `docs/screenshots/` at 375/768/1440.
+
+**Verification:**
+
+| Command                               | Result                                            |
+| ------------------------------------- | ------------------------------------------------- |
+| `pnpm lint` / `pnpm typecheck`        | Pass                                              |
+| `pnpm test`                           | 136 passed / 136                                  |
+| `pnpm db:verify`                      | 54 passed / 54                                    |
+| `pnpm build`                          | Compiled successfully                             |
+| `pnpm test:e2e`                       | 45 passed, 55 skipped                             |
+| `SCREENSHOTS=1 … screenshots.spec.ts` | 27 passed; no horizontal overflow at 375/768/1440 |
+
+One regression found and fixed during verification: a new sidebar footer used `text-muted-foreground/70`, which failed axe contrast (3.58:1) on the **light admin** preview sidebar; changed to full `text-muted-foreground`. All preview workspace pages pass axe under the new navy theme. The mutating preview board E2E flaked once under full-suite contention and passed in isolation (11/11) and on a clean re-run (45 passed); the Kanban move and drag interactions are intact.
+
+**Boundaries honoured:** no hosted writes, no invitations, no Auth changes, no deploy, no AI, no real customer records touched; admin area and landing left intact; no database migration (none needed).

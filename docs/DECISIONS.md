@@ -407,3 +407,16 @@ Chronological architecture decision records. Statuses: Proposed | Approved | Imp
 - Implementation reference: `src/server/actions/admin.ts` (`reissueInvitationAction`), `src/components/forms/resend-invite-button.tsx`, `src/components/views/members-table.tsx` (`showResend`), `src/lib/validation/admin.ts`, `src/server/audit.ts`.
 - Verification evidence: `tests/unit/admin-actions.test.ts`, `tests/db/membership-activation.test.ts`, `tests/unit/resend-invite-button.test.tsx`; full suite green 2026-10-20 (`docs/DAILY_LOG.md`).
 - Status: Implemented (local + tests); no hosted change required
+
+### ADR-032 — Customer workspace adopts the navy theme via a scoped `.app` token set
+
+- Date: 2026-10-20
+- Context / problem: the authenticated customer workspace still used the light warm-neutral theme while the landing page established a premium navy design language. The workspace needed the same quality without disturbing the platform-admin area, the landing page, or any behaviour.
+- Options considered: (a) switch the global `.dark`/`:root` tokens to navy — would restyle the admin area too and couple the app to a single palette; (b) per-page styling — inconsistent and unmaintainable; (c) a scoped `.app` token set applied only to the workspace shell, with shared components reading the tokens so they adapt per scope.
+- Chosen approach: (c). `.app` in `src/app/globals.css` redefines the shadcn token set (navy, derived from `.landing`, cards one step above the canvas); `AppShell theme="app"` applies it, passed by the real workspace layout and the preview workspace layout only. Shared components (shell, nav, page header, stat card, empty state, Kanban, stage accents) were polished with token-based classes, so the admin area keeps its light look and the landing is unchanged (its embedded showcase inherits the refined Kanban cosmetics).
+- Why this approach: one token scope + token-driven components give a cohesive premium look with no duplication, no server action / route / data / RLS change, and a clean boundary (admin and landing untouched). Verifiable via the preview with synthetic data.
+- Trade-offs / risks: shared shell components also appear in the admin area, so the brand tile, sticky header and wider sidebar carry over there (minor, functional, not a redesign); a reduced-opacity footer text had to be corrected for contrast on the light admin sidebar (caught by axe).
+- Security and privacy implications: none; CSS and presentational markup only.
+- Implementation reference: `src/app/globals.css` (`.app`, `.app-sidebar-surface`, `.app-brand-mark`, `.app-aurora`), `src/components/app-shell.tsx` (`theme`), `nav-link.tsx`, `page-header.tsx`, `kanban/kanban-board.tsx`, `stage-badge.tsx` (`stageAccentClass`), `views/workspace-overview.tsx`, the two workspace layouts.
+- Verification evidence: `pnpm check` green, `pnpm test:e2e` 45 passed / 55 skipped, all preview workspace pages pass axe under the new theme, screenshots at 375/768/1440 (`docs/DAILY_LOG.md`, `docs/DESIGN.md` §8.2).
+- Status: Implemented
