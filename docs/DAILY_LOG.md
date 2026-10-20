@@ -565,3 +565,26 @@ One test-authoring slip was fixed before recording: the audit insert used `$1` a
 **Verified vs pending:** script and database flow verified locally; the hosted bootstrap waits for the owner's choices in `docs/BOOTSTRAP_ADMIN_PLAN.md` §7 (key entry, dry run, then `--apply`). Not done: hosted user, hosted auth settings, deployment, AI integration.
 
 **Follow-up (CI):** the commit above failed only in `pnpm test:e2e`, chromium profile, "no detectable accessibility violations on the landing page": the poll that waits for every `[data-reveal]` element to reach opacity 1 timed out with 4–6 elements still hidden (three attempts). Cause: the test stepped through the page with `window.scrollTo` and 60 ms pauses; on a slow runner the IntersectionObserver behind Motion's `whileInView` missed elements the scroll jumped past, and with `once: true` they never appeared. Fix: `tests/e2e/helpers/reveal.ts` scrolls each `[data-reveal]` element into view and waits for its opacity, deterministically; used by the landing accessibility test and by the screenshot captures (the latter not re-run; opt-in). Local verification against a fresh standalone build: `playwright test tests/e2e/landing.spec.ts --project=chromium --project=mobile --repeat-each=2` → 20 passed. Nothing in the bootstrap work changed.
+
+## 2026-10-20 (continued) — First-admin bootstrap: approved dry run (reads only)
+
+**Request:** the owner saved `SUPABASE_SERVICE_ROLE_KEY` in `.env.local` (`pnpm env:check bootstrap`: all present) and approved the dry run only, per `docs/BOOTSTRAP_ADMIN_PLAN.md`; verify the project reference first; report counts, intended changes and warnings; no `--apply`, no users, no hosted auth change, no deployment; never expose credentials or links.
+
+**Pre-flight (verified):** working tree clean at `6c21caa`; `pnpm env:check bootstrap` → "all present" (names and lengths only); `SUPABASE_PROJECT_REF`, the linked project ref in `supabase/.temp/project-ref` and the host of `NEXT_PUBLIC_SUPABASE_URL` all equal `zcxmyaxpftzwpzvmhslm`; `NEXT_PUBLIC_APP_URL` = `http://localhost:3000`.
+
+**Dry run, verbatim (placeholder email and name; the dry run never prints or transmits the email, it only compares it with existing admins, of which there are none):**
+
+```text
+pnpm bootstrap:admin --email admin@example.test --name "Platform Admin" --project-ref zcxmyaxpftzwpzvmhslm
+Project zcxmyaxpftzwpzvmhslm (zcxmyaxpftzwpzvmhslm.supabase.co); app URL http://localhost:3000; mode DRY RUN.
+Existing platform admins: 0; auth users: 0.
+Would create the auth user by invitation, insert the platform_admins row and an admin.bootstrapped audit row, then print a one-time link.
+DRY RUN: nothing was created or written. Re-run with --apply to proceed.
+exit=0
+```
+
+The output was passed through a masking filter for key and token patterns as a safety net; nothing needed masking. Calls made with the service-role key: `platform_admins` select (0 rows), `auth.admin.listUsers` page 1 (total 0). No write, no link generated.
+
+**Warnings:** none from the script. Notes for the real run: the link host is `http://localhost:3000`, so the local app must run on port 3000 when the link is opened (the preview server on 3100 is unaffected); the hosted Auth settings remain unverified (token lacks `auth_config_read`) but none blocks the bootstrap at defaults; the real run needs the owner's chosen email and display name, which the dry run did not have.
+
+**Verified vs pending:** dry run done; `--apply` waits for the owner's explicit approval with the email and name (plan §4 step 3–4). Not done: hosted user, hosted auth settings, deployment, AI integration.

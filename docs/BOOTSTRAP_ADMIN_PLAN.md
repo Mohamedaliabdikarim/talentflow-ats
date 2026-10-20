@@ -1,6 +1,6 @@
 # First platform admin — bootstrap plan for approval
 
-**Date:** 2026-10-20. **Status:** reviewed, hardened and rehearsed locally; **nothing executed on the hosted project**. The service-role key is not yet in `.env.local`. Steps 1–3 need the owner's input; step 4 needs a separate explicit approval.
+**Date:** 2026-10-20. **Status:** reviewed, hardened and rehearsed locally; step 1 done by the owner (key saved, `pnpm env:check bootstrap` all present); **step 2 dry run executed with approval: 0 platform admins, 0 auth users, nothing written**. Waiting at step 3 for the owner's email, name and explicit approval of step 4 (`--apply`). No hosted user exists.
 
 **In one paragraph.** `pnpm bootstrap:admin` creates the first platform admin of project `zcxmyaxpftzwpzvmhslm`: one `auth.users` row through an invitation link, one `profiles` row filled by the database trigger, one `platform_admins` row, one `admin.bootstrapped` audit row, and a single-use link that the admin opens to set a password. The script was reworked today to be dry-run by default, to refuse when an admin already exists, to validate its inputs, to fail loudly with recovery guidance, and to keep the invitation token out of the terminal and out of this conversation (`--link-file`). The database side was rehearsed step by step against the current schema (migrations 0001–0004) and the script against a fake service-role client. No hosted Auth setting has to change for the bootstrap to work.
 

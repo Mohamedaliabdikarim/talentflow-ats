@@ -143,6 +143,14 @@ Unit count note: 73 before and 74 after the pending-invite refinement in `invite
 | T23 (hosted migrations apply in order)                                                                           | **Verified**                                                                                                                |                                          |
 | `pnpm db:verify`                                                                                                 | 36 passed / 36 (4 files)                                                                                                    | adds `privilege-hardening.test.ts` (T30) |
 
+### 2026-10-20 — First-admin bootstrap dry run on the hosted project (reads only, approved)
+
+| Command / call                                                  | Result                                                                                            | Notes                                      |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| Pre-flight (env names, ref in env / link file / URL host)       | all present; all three refs equal `zcxmyaxpftzwpzvmhslm`                                          |                                            |
+| `pnpm bootstrap:admin --email … --project-ref …` (no `--apply`) | exit 0; "Existing platform admins: 0; auth users: 0."; "DRY RUN: nothing was created or written." | placeholder email; service-role reads only |
+| T31 (bootstrap safeguards)                                      | dry-run path verified on the hosted project                                                       | `--apply` pending approval                 |
+
 ### 2026-10-20 — First-admin bootstrap prepared (local only; nothing executed on the hosted project)
 
 | Command / call                               | Result                                          | Notes                                                  |
