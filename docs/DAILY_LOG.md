@@ -1004,3 +1004,33 @@ exit=0
 4. Prompt quality on real CVs (budget 40k chars; thin job descriptions give thin assessments) — review with the first real run.
 
 Docs: `docs/AI_INSIGHTS.md` (new), ADR-035/036/037, `docs/SECURITY.md` §10, `docs/DEPLOYMENT.md` (env + scheduler), `docs/TEST_PLAN.md` T36–T40, `docs/PRD.md` R18, `docs/AI_FEATURE.md` status, `CLAUDE.md`, `.env.example`.
+
+## 2026-10-21 (continued) — Approved push of migrations 0006 + 0007 (Candidate Insights) to the hosted project
+
+Owner approval received for applying migrations 0006 and 0007 only, conditional on a fresh dry-run showing nothing else pending and both files being non-destructive. No candidate, application or CV data was touched; no code changed.
+
+**Pre-flight (read-only):**
+
+- `SUPABASE_PROJECT_REF` confirmed as `zcxmyaxpftzwpzvmhslm`; `pnpm supabase:hosted list-remote` showed 5 applied, `20261021130000` and `20261021140000` local-only.
+- `pnpm supabase:hosted dry-run` → "Would push these migrations: 20261021130000_insights_enum.sql, 20261021140000_insights_lifecycle.sql" and nothing else.
+- Active statements reviewed: 0006 = four `alter type … add value if not exists`; 0007 = `add constraint applications_id_organization_unique unique (id, organization_id)`, seven `add column` (nullable or with defaults), one check constraint, one composite foreign key, two `create index`. The only destructive keyword is `on delete cascade` inside the foreign-key definition (a referential action for future application deletions, matching the table's existing composite keys from 0001); no `drop`/`delete`/`truncate`/`update`. Rollback statements in 0007 are comments.
+- Baseline counts over the session pooler inside a `READ ONLY` transaction (scratch runner, prints counts only): organizations 1, jobs 1, candidates 1 (0 with CV, 0 AI-authorized), applications 1 (stage mix `screening=1`), candidate_ai_insights 0, memberships 1, audit_events 13; enum `pending,completed,failed`; 0 of the new columns/constraints/indexes present.
+
+**Apply:** `pnpm supabase:hosted push` → "Applying migration 20261021130000_insights_enum.sql… Applying migration 20261021140000_insights_lifecycle.sql… Finished supabase db push." exit 0.
+
+**Verification (read-only, same queries):**
+
+| Check                                                                                                                            | Before                   | After                                                                                                                                                                                                       |
+| -------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `supabase_migrations.schema_migrations` rows / latest                                                                            | 5 / 20261021120000       | 7 / 20261021140000                                                                                                                                                                                          |
+| `insight_status` labels                                                                                                          | pending,completed,failed | pending,completed,failed,analyzing,ready,revoked,superseded                                                                                                                                                 |
+| new columns on `candidate_ai_insights`                                                                                           | 0                        | 7                                                                                                                                                                                                           |
+| `applications_id_organization_unique`, `…_application_same_tenant`, `…_analysis_type_check`                                      | 0                        | 3                                                                                                                                                                                                           |
+| `candidate_ai_insights_one_active_per_application`, `candidate_ai_insights_application_idx`                                      | 0 / 0                    | 1 / 1                                                                                                                                                                                                       |
+| RLS enabled on `candidate_ai_insights` / `applications`                                                                          | true / true              | true / true                                                                                                                                                                                                 |
+| every data count (organizations, jobs, candidates, CV, authorized, applications, stage mix, insights, memberships, audit events) | as above                 | identical                                                                                                                                                                                                   |
+| schema fingerprint (`scripts/db/schema-fingerprint.sql`)                                                                         | —                        | hosted `1efff8ca82e8c25fe39eb9ff6c86d4d9` = local `pnpm db:fingerprint` `1efff8ca82e8c25fe39eb9ff6c86d4d9` (objects 248, columns 99, policies 16, functions 10, triggers 13, auth triggers 2, RLS tables 9) |
+
+`pnpm supabase:hosted list-remote` after the push lists all seven migrations with matching local/remote versions.
+
+**Not done (per instruction, stop here):** the live AI test (T40). Still required before it: `pnpm env:set INSIGHTS_RUNNER_SECRET` locally and a dev-server restart; a synthetic candidate with an authorized CV; the Azure content-retention decision remains open (`docs/SECURITY.md` §10).

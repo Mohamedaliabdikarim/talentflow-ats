@@ -458,7 +458,7 @@ Chronological architecture decision records. Statuses: Proposed | Approved | Imp
 - Security and privacy implications: see ADR-036 (execution) and ADR-037 (revocation). All reads/writes from the UI go through `requireOrgAccess` plus RLS; CV text exists only in memory during a run; only the validated structured result and a SHA-256 input hash are stored; logs carry ids, outcomes and sanitised error kinds. Provider retention is flagged, not assumed (`docs/AI_INSIGHTS.md` §2).
 - Implementation reference: `docs/AI_INSIGHTS.md`; `supabase/migrations/20261021130000_insights_enum.sql`, `20261021140000_insights_lifecycle.sql`; `src/lib/ai/insights-contract.ts`, `job-match-prompt.ts`, `job-match.ts`; `src/server/insights/queue.ts`; `src/server/actions/insights.ts`, `applications.ts`; `src/server/data/insights.ts`; `src/components/insights/insights-panel.tsx`, `src/components/views/application-detail.tsx`; tests `tests/unit/insights-*.test.ts`, `job-match-prompt.test.ts`, `applications-trigger.test.ts`, `tests/db/insights.test.ts`.
 - Verification evidence: `docs/DAILY_LOG.md` (2026-10-21, Candidate Insights) and `docs/TEST_PLAN.md` T36–T39.
-- Status: Implemented locally; migrations 0006/0007 not applied to the hosted project (await approval); live end-to-end with Azure pending the owner's run
+- Status: Implemented locally; migrations 0006/0007 applied to the hosted project 2026-10-21 (approved push; history 7; schema fingerprint identical to local); live end-to-end with Azure pending the owner's run
 
 ### ADR-036 — Durable execution for AI runs: queued row + secret-authenticated runner endpoint
 

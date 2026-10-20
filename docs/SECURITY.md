@@ -122,4 +122,4 @@ Candidate CVs are PDFs held in a **private** Supabase Storage bucket (`candidate
 
 **Flagged, not decided here:** Azure OpenAI's abuse-monitoring content retention (up to 30 days unless the resource is approved for no content logging) and the resource's region are not recorded in project documentation. The owner must confirm the resource's configuration and record it in this section before relying on the feature for real candidates (`docs/AI_INSIGHTS.md` §2).
 
-**Hosted setup (requires approval):** migrations `20261021130000_insights_enum.sql` and `20261021140000_insights_lifecycle.sql` via the approved push path; `INSIGHTS_RUNNER_SECRET` in the server environment; a scheduled call to the runner (`docs/DEPLOYMENT.md` §4.6).
+**Hosted setup:** migrations `20261021130000_insights_enum.sql` and `20261021140000_insights_lifecycle.sql` were applied 2026-10-21 through the approved push path (history 7, schema fingerprint identical to local); still needed: `INSIGHTS_RUNNER_SECRET` in the server environment; a scheduled call to the runner (`docs/DEPLOYMENT.md` §4.6).
