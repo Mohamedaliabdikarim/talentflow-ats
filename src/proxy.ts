@@ -12,7 +12,10 @@ import { NextResponse, type NextRequest } from "next/server";
  * the tenant, and PostgreSQL RLS is the final authority (docs/SECURITY.md §4).
  */
 
-const PUBLIC_PREFIXES = ["/login", "/auth", "/api/health"];
+// /api/insights/run is not session-authenticated: it authenticates itself with a shared secret
+// (INSIGHTS_RUNNER_SECRET) so a scheduler can call it (docs/AI_INSIGHTS.md §5). It never
+// accepts tenant data; it only processes rows already queued by an authorized Server Action.
+const PUBLIC_PREFIXES = ["/login", "/auth", "/api/health", "/api/insights/run"];
 // Local preview (synthetic data) is public only when enabled; see src/preview/enabled.ts.
 const PREVIEW_ENABLED =
   process.env.NODE_ENV !== "production" || process.env.TALENTFLOW_PREVIEW === "1";

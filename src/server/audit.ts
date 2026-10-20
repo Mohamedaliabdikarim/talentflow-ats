@@ -14,6 +14,10 @@ export type AuditAction =
   | "candidate.cv_deleted"
   | "candidate.cv_ai_authorized"
   | "candidate.cv_ai_revoked"
+  | "candidate.ai_insight_requested"
+  | "candidate.ai_insight_ready"
+  | "candidate.ai_insight_failed"
+  | "candidate.ai_insights_invalidated"
   | "auth.signed_in"
   | "auth.signed_out"
   | "auth.password_established";

@@ -22,6 +22,11 @@ const serverEnvSchema = publicEnvSchema.extend({
   AZURE_OPENAI_DEPLOYMENT: z.string().min(1).optional(),
   // Optional: only needed if the Azure v1 endpoint requires an explicit api-version query.
   AZURE_OPENAI_API_VERSION: z.string().min(1).optional(),
+  /**
+   * Shared secret for the internal insights runner endpoint (POST /api/insights/run). When unset,
+   * queued analyses wait for a manual retry or a scheduled run; nothing is ever kicked without it.
+   */
+  INSIGHTS_RUNNER_SECRET: z.string().min(16).optional(),
   GITHUB_TOKEN: z.string().min(1).optional(),
 });
 
@@ -53,6 +58,7 @@ export function getServerEnv(): ServerEnv {
     AZURE_OPENAI_API_KEY: emptyToUndefined(process.env.AZURE_OPENAI_API_KEY),
     AZURE_OPENAI_DEPLOYMENT: emptyToUndefined(process.env.AZURE_OPENAI_DEPLOYMENT),
     AZURE_OPENAI_API_VERSION: emptyToUndefined(process.env.AZURE_OPENAI_API_VERSION),
+    INSIGHTS_RUNNER_SECRET: emptyToUndefined(process.env.INSIGHTS_RUNNER_SECRET),
     GITHUB_TOKEN: emptyToUndefined(process.env.GITHUB_TOKEN),
   });
 }

@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Sparkles } from "lucide-react";
 import { ConfirmActionDialog } from "@/components/confirm-action-dialog";
+import { Button } from "@/components/ui/button";
 import { AddToPipelineDialog } from "@/components/forms/add-to-pipeline-dialog";
 import { CandidateCvCard } from "@/components/forms/candidate-cv-card";
 import { PermissionDenied } from "@/components/permission-denied";
@@ -91,6 +94,14 @@ export default async function CandidateDetailPage({
           description="The application starts in the New stage of that job's pipeline."
         />
       }
+      renderApplicationLink={(application) => (
+        <Button asChild variant="outline" size="sm">
+          <Link href={`${base}/applications/${application.id}`}>
+            <Sparkles aria-hidden="true" />
+            Insights
+          </Link>
+        </Button>
+      )}
       renderRemove={(application) => (
         <ConfirmActionDialog
           action={removeApplicationAction.bind(null, orgSlug, application.id)}

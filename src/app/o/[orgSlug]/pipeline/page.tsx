@@ -33,6 +33,7 @@ export default async function PipelinePage({
       filters={filters}
       cards={cards}
       generatedAt={generatedAt}
+      linkApplications
     />
   );
 }

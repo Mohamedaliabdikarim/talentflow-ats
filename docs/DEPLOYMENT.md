@@ -13,14 +13,15 @@
 
 ## 2. Environment variables
 
-| Name                                                                       | Scope       | Purpose                                                          |
-| -------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`                                                 | public      | Supabase project URL                                             |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY`                                            | public      | Anon (publishable) key; safe for the browser because RLS applies |
-| `SUPABASE_SERVICE_ROLE_KEY`                                                | server only | Provisioning operations; never exposed                           |
-| `NEXT_PUBLIC_APP_URL`                                                      | public      | Canonical URL used for auth redirects                            |
-| `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT` | server only | Optional AI feature                                              |
-| `GITHUB_TOKEN`                                                             | server only | Optional; raises GitHub API rate limit                           |
+| Name                                                                       | Scope       | Purpose                                                                                     |
+| -------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`                                                 | public      | Supabase project URL                                                                        |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`                                            | public      | Anon (publishable) key; safe for the browser because RLS applies                            |
+| `SUPABASE_SERVICE_ROLE_KEY`                                                | server only | Provisioning operations; never exposed                                                      |
+| `NEXT_PUBLIC_APP_URL`                                                      | public      | Canonical URL used for auth redirects                                                       |
+| `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT` | server only | Optional AI feature                                                                         |
+| `INSIGHTS_RUNNER_SECRET`                                                   | server only | Shared secret for `POST /api/insights/run` (Candidate Insights runner, ADR-036); ≥ 16 chars |
+| `GITHUB_TOKEN`                                                             | server only | Optional; raises GitHub API rate limit                                                      |
 
 `src/lib/env.ts` validates these at startup. `.env.example` lists names without values.
 
@@ -41,6 +42,7 @@
 3. Deployment: GitHub Actions workflow builds with pnpm, runs tests, uploads `.next/standalone` + `.next/static` + `public` as the artifact, deploys with `azure/webapps-deploy` using a publish profile stored as a GitHub secret.
 4. Health check path: `/api/health`.
 5. HTTPS only; minimum TLS 1.2.
+6. **Candidate Insights runner (ADR-036):** set `INSIGHTS_RUNNER_SECRET` in application settings and schedule `POST https://<app>/api/insights/run` with header `x-insights-secret: <secret>` and an empty body every 2–5 minutes (an App Service WebJob with a cron schedule, Azure Logic Apps, or any HTTP scheduler). The queueing action already kicks the endpoint immediately; the schedule is what makes a queued analysis durable across restarts and also recovers runs stuck in `analyzing` for more than ten minutes. The endpoint answers 404 to a missing or wrong secret. Keep `NEXT_PUBLIC_APP_URL` set to the public URL: the immediate kick calls it.
 
 ## 5. Rollout and rollback
 

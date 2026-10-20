@@ -43,6 +43,8 @@ type KanbanBoardProps = {
   basePath?: string;
   /** Defaults to the real Server Action; the preview passes an in-memory one. */
   moveAction?: MoveAction;
+  /** Adds an "Open application" entry per card (the preview has no application pages). */
+  linkApplications?: boolean;
 };
 
 const STAGE_SET = new Set<string>(APPLICATION_STAGES);
@@ -77,6 +79,7 @@ export function KanbanBoard({
   now,
   basePath = `/o/${orgSlug}`,
   moveAction = moveApplicationStageAction,
+  linkApplications = false,
 }: KanbanBoardProps) {
   const [optimisticCards, applyMove] = useOptimistic(cards, (state: PipelineCard[], move: Move) =>
     state.map((card) =>
@@ -158,6 +161,7 @@ export function KanbanBoard({
                         now={now}
                         onMove={move}
                         onDragOver={handleDragOver}
+                        linkApplication={linkApplications}
                       />
                     ))}
                   </AnimatePresence>
@@ -182,12 +186,14 @@ function KanbanCard({
   now,
   onMove,
   onDragOver,
+  linkApplication,
 }: {
   card: PipelineCard;
   basePath: string;
   now: number;
   onMove: (card: PipelineCard, stage: ApplicationStage) => void;
   onDragOver: (stage: ApplicationStage | null) => void;
+  linkApplication: boolean;
 }) {
   const [dragging, setDragging] = useState(false);
   const age = formatStageAge(daysInStage(card.stageChangedAt, now));
@@ -251,6 +257,11 @@ function KanbanCard({
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
+            {linkApplication ? (
+              <DropdownMenuItem asChild>
+                <Link href={`${basePath}/applications/${card.id}`}>Open application</Link>
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuItem asChild>
               <Link href={`${basePath}/jobs/${card.jobId}`}>Open job</Link>
             </DropdownMenuItem>

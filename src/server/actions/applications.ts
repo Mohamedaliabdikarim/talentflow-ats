@@ -11,7 +11,8 @@ import {
   STAGE_LABELS,
 } from "@/lib/validation/application";
 import { runAction } from "@/server/actions/run";
-import { requireOrgAccess } from "@/server/auth";
+import { type OrganizationContext, requireOrgAccess } from "@/server/auth";
+import { enqueueJobMatchInsight } from "@/server/insights/queue";
 
 const UNIQUE_VIOLATION = "23505";
 const FOREIGN_KEY_VIOLATION = "23503";
@@ -67,6 +68,16 @@ export async function moveApplicationStageAction(
     const parsed = moveApplicationSchema.safeParse(input);
     if (!parsed.success) return errorState("Unknown stage");
     const supabase = await createServerSupabase();
+    // The current stage is read first so the New → Screening transition can be recognised.
+    const { data: current, error: lookupError } = await supabase
+      .from("applications")
+      .select("stage")
+      .eq("id", parsed.data.applicationId)
+      .eq("organization_id", organization.id)
+      .maybeSingle();
+    if (lookupError) throw new Error(`application lookup failed: ${lookupError.message}`);
+    if (!current) return errorState("This application no longer exists");
+
     const { data, error } = await supabase
       .from("applications")
       .update({ stage: parsed.data.stage })
@@ -76,6 +87,10 @@ export async function moveApplicationStageAction(
       .maybeSingle();
     if (error) throw new Error(`application update failed: ${error.message}`);
     if (!data) return errorState("This application no longer exists");
+
+    if (current.stage === "new" && parsed.data.stage === "screening") {
+      await queueScreeningInsights(supabase, organization, parsed.data.applicationId);
+    }
     revalidateWorkspace(orgSlug);
     return {
       status: "success",
@@ -83,6 +98,28 @@ export async function moveApplicationStageAction(
       data: undefined,
     };
   });
+}
+
+/**
+ * Queues Candidate Insights when an application enters Screening from New (ADR-035). The stage
+ * change is already committed at this point and must stand whatever happens here, so failures
+ * are logged (ids only) and never surfaced as an error for the move. A candidate without an
+ * authorized CV simply gets nothing queued; the application page explains why.
+ */
+async function queueScreeningInsights(
+  supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+  organization: OrganizationContext,
+  applicationId: string,
+): Promise<void> {
+  try {
+    await enqueueJobMatchInsight({ supabase, organization, applicationId });
+  } catch (error) {
+    console.error(
+      `[insights] could not queue analysis for application ${applicationId}: ${
+        error instanceof Error ? error.message : "unknown error"
+      }`,
+    );
+  }
 }
 
 /** Removes a candidate from a job's pipeline. Called from a confirmed form submit. */

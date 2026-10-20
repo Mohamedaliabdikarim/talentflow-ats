@@ -24,6 +24,8 @@ type CandidateDetailViewProps = {
   actions?: React.ReactNode;
   /** Per-application remove control; omitted in read-only contexts. */
   renderRemove?: (application: CandidateApplicationRow) => React.ReactNode;
+  /** Per-application link to its detail page (insights); omitted where no such page exists. */
+  renderApplicationLink?: (application: CandidateApplicationRow) => React.ReactNode;
   /** Delete control; omitted in read-only contexts. */
   dangerZone?: React.ReactNode;
   /** CV upload/consent card; rendered on the real detail page, omitted in the preview. */
@@ -36,6 +38,7 @@ export function CandidateDetailView({
   applications,
   actions,
   renderRemove,
+  renderApplicationLink,
   dangerZone,
   cvSection,
 }: CandidateDetailViewProps) {
@@ -95,6 +98,7 @@ export function CandidateDetailView({
                       <TableHead>Job</TableHead>
                       <TableHead>Stage</TableHead>
                       <TableHead>Stage since</TableHead>
+                      {renderApplicationLink ? <TableHead className="w-0" /> : null}
                       {renderRemove ? <TableHead className="w-0" /> : null}
                     </TableRow>
                   </TableHeader>
@@ -115,6 +119,9 @@ export function CandidateDetailView({
                         <TableCell className="text-muted-foreground">
                           {formatDateTime(application.stage_changed_at)}
                         </TableCell>
+                        {renderApplicationLink ? (
+                          <TableCell>{renderApplicationLink(application)}</TableCell>
+                        ) : null}
                         {renderRemove ? <TableCell>{renderRemove(application)}</TableCell> : null}
                       </TableRow>
                     ))}

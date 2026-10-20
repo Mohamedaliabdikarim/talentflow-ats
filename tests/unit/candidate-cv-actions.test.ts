@@ -45,6 +45,9 @@ vi.mock("@/server/auth", () => ({
   },
 }));
 vi.mock("@/server/audit", () => ({ recordAuditEvent }));
+// Revocation behaviour (ADR-037) is covered by its own tests; here we assert it is invoked.
+const invalidateCandidateInsights = vi.fn(async () => 0);
+vi.mock("@/server/insights/invalidate", () => ({ invalidateCandidateInsights }));
 
 function maybeSingle<T>(value: T) {
   return { maybeSingle: async () => value };
@@ -113,6 +116,7 @@ beforeEach(() => {
   calls.removes.length = 0;
   calls.updates.length = 0;
   recordAuditEvent.mockClear();
+  invalidateCandidateInsights.mockClear();
 });
 
 describe("uploadCandidateCvAction", () => {
@@ -189,6 +193,23 @@ describe("deleteCandidateCvAction", () => {
     expect(calls.removes).toContain("org1/c1/x.pdf");
     expect(recordAuditEvent).toHaveBeenCalledWith("candidate.cv_deleted", expect.any(Object));
   });
+
+  it("invalidates AI insights derived from the deleted CV (ADR-037)", async () => {
+    state.candidate = { id: "c1", cv_object_key: "org1/c1/x.pdf" };
+    await deleteCandidateCvAction("acme", "c1", idle, new FormData());
+    expect(invalidateCandidateInsights).toHaveBeenCalledWith(
+      expect.anything(),
+      "org1",
+      "c1",
+      "cv_deleted",
+    );
+  });
+
+  it("does not touch insights when there was no CV to delete", async () => {
+    state.candidate = { id: "c1", cv_object_key: null };
+    await deleteCandidateCvAction("acme", "c1", idle, new FormData());
+    expect(invalidateCandidateInsights).not.toHaveBeenCalled();
+  });
 });
 
 describe("authorizeCandidateCvAiAction", () => {
@@ -252,5 +273,26 @@ describe("revokeCandidateCvAiAction", () => {
     expect(result).toMatchObject({ status: "success" });
     expect(calls.updates[0]).toMatchObject({ cv_ai_authorized: false, cv_ai_authorized_by: null });
     expect(recordAuditEvent).toHaveBeenCalledWith("candidate.cv_ai_revoked", expect.any(Object));
+  });
+
+  it("invalidates every AI insight of the candidate after revoking (ADR-037)", async () => {
+    await revokeCandidateCvAiAction("acme", "c1", idle, new FormData());
+    expect(invalidateCandidateInsights).toHaveBeenCalledWith(
+      expect.anything(),
+      "org1",
+      "c1",
+      "authorization_revoked",
+    );
+    // Consent is cleared before the insights are invalidated, so a run that re-checks consent
+    // at that instant already sees it withdrawn.
+    const consentCleared = calls.updates.findIndex((u) => u.cv_ai_authorized === false);
+    expect(consentCleared).toBe(0);
+  });
+
+  it("does not invalidate insights when the candidate does not exist", async () => {
+    state.updateReturnsNull = true;
+    const result = await revokeCandidateCvAiAction("acme", "c1", idle, new FormData());
+    expect(result.status).toBe("error");
+    expect(invalidateCandidateInsights).not.toHaveBeenCalled();
   });
 });

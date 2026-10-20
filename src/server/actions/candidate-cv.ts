@@ -14,6 +14,7 @@ import {
 import { runAction } from "@/server/actions/run";
 import { recordAuditEvent } from "@/server/audit";
 import { requireOrgAccess } from "@/server/auth";
+import { invalidateCandidateInsights } from "@/server/insights/invalidate";
 
 /**
  * Candidate CV (PDF) upload, replace, delete and AI-use consent (ADR-033, docs/SECURITY.md §9).
@@ -157,6 +158,9 @@ export async function deleteCandidateCvAction(
     if (error) throw new Error(`cv metadata clear failed: ${error.message}`);
     if (!updated) return errorState("This candidate no longer exists.");
 
+    // Insights derived from this CV lose their basis with it (ADR-037).
+    await invalidateCandidateInsights(supabase, organization.id, candidateId, "cv_deleted");
+
     await supabase.storage.from(CV_BUCKET).remove([candidate.cv_object_key]);
 
     await recordAuditEvent("candidate.cv_deleted", {
@@ -245,6 +249,15 @@ export async function revokeCandidateCvAiAction(
       .maybeSingle();
     if (error) throw new Error(`cv ai revoke failed: ${error.message}`);
     if (!updated) return errorState("This candidate no longer exists.");
+
+    // Withdrawn authorization invalidates every existing insight and stops in-flight runs
+    // (ADR-037): their status-guarded write then affects no rows.
+    await invalidateCandidateInsights(
+      supabase,
+      organization.id,
+      candidateId,
+      "authorization_revoked",
+    );
 
     await recordAuditEvent("candidate.cv_ai_revoked", {
       organizationId: organization.id,

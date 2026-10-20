@@ -16,6 +16,8 @@ type PipelineViewProps = {
   generatedAt: number;
   /** Overrides the Server Action used for stage moves (preview mode). */
   moveAction?: MoveAction;
+  /** Cards link to their application page (real workspace only; the preview has none). */
+  linkApplications?: boolean;
 };
 
 export function PipelineView({
@@ -26,6 +28,7 @@ export function PipelineView({
   cards,
   generatedAt,
   moveAction,
+  linkApplications = false,
 }: PipelineViewProps) {
   const activeJob = filters.jobId ? jobs.find((job) => job.id === filters.jobId) : undefined;
   const hasFilters = Boolean(filters.jobId || filters.q);
@@ -75,6 +78,7 @@ export function PipelineView({
           cards={cards}
           now={generatedAt}
           moveAction={moveAction}
+          linkApplications={linkApplications}
         />
       )}
     </FadeIn>

@@ -139,6 +139,13 @@ export type Database = {
           created_by: string | null;
           created_at: string;
           updated_at: string;
+          application_id: string | null;
+          analysis_type: string;
+          input_hash: string | null;
+          cv_consent_at: string | null;
+          started_at: string | null;
+          attempt_count: number;
+          contract_version: string | null;
         };
         Insert: {
           id?: string;
@@ -159,6 +166,13 @@ export type Database = {
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          application_id?: string | null;
+          analysis_type?: string;
+          input_hash?: string | null;
+          cv_consent_at?: string | null;
+          started_at?: string | null;
+          attempt_count?: number;
+          contract_version?: string | null;
         };
         Update: {
           id?: string;
@@ -179,8 +193,22 @@ export type Database = {
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          application_id?: string | null;
+          analysis_type?: string;
+          input_hash?: string | null;
+          cv_consent_at?: string | null;
+          started_at?: string | null;
+          attempt_count?: number;
+          contract_version?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "candidate_ai_insights_application_same_tenant";
+            columns: ["application_id", "organization_id"];
+            isOneToOne: false;
+            referencedRelation: "applications";
+            referencedColumns: ["id", "organization_id"];
+          },
           {
             foreignKeyName: "candidate_ai_insights_candidate_same_tenant";
             columns: ["candidate_id", "organization_id"];
@@ -582,7 +610,8 @@ export type Database = {
     };
     Enums: {
       application_stage: "new" | "screening" | "interview" | "offer" | "hired" | "rejected";
-      insight_status: "pending" | "completed" | "failed";
+      insight_status:
+        "pending" | "completed" | "failed" | "analyzing" | "ready" | "revoked" | "superseded";
       job_status: "draft" | "open" | "closed";
       membership_role: "owner" | "member";
       membership_status: "invited" | "active" | "disabled";

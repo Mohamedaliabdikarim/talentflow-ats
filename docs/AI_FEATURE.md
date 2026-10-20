@@ -1,6 +1,6 @@
 # TalentFlow ATS — AI Candidate Insights (optional, gated)
 
-**Status:** Not implemented. Design only. The feature is implemented only after all mandatory ATS features pass functional and tenant-isolation tests and the deployment path is viable (spec §6, delivery gate).
+**Status:** Superseded for the job-match workflow by `docs/AI_INSIGHTS.md` (ADR-035/036/037, implemented locally 2026-10-21). This page keeps the original design; the implemented output contract uses the statuses `supported | needs_verification | not_evidenced` and no GitHub enrichment. The GitHub/profile workflow described below remains not implemented.
 
 ## 1. Purpose
 

@@ -126,8 +126,12 @@ describe("tenant pinning", () => {
       stage: "interview",
     });
     expect(moved).toMatchObject({ status: "success", message: "Moved to Interview" });
-    expect(h.calls[0]).toMatchObject({ table: "applications", op: "update" });
+    // The stage lookup (ADR-035 trigger detection) and the update are both tenant-scoped.
+    expect(h.calls[0]).toMatchObject({ table: "applications", op: "" });
     expect(h.calls[0].filters).toEqual(expect.arrayContaining([["organization_id", "org-1"]]));
+    const update = h.calls.find((call) => call.table === "applications" && call.op === "update");
+    expect(update).toBeDefined();
+    expect(update!.filters).toEqual(expect.arrayContaining([["organization_id", "org-1"]]));
   });
 });
 

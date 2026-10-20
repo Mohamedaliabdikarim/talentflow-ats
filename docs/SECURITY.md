@@ -107,3 +107,19 @@ Candidate CVs are PDFs held in a **private** Supabase Storage bucket (`candidate
 2. Apply `supabase/storage/candidate-cvs.sql` once in the hosted project (SQL editor or Management API): it creates the private bucket and the four `storage.objects` policies. Rollback statements are at the bottom of that file; the migration is reversible by dropping the added columns.
 
 **Unverified without hosted Storage:** real upload / view / replace / delete round-trips need the hosted bucket and PostgREST, which the local harness does not provide. They are covered indirectly by the validation unit tests, the action unit tests (authorization, consent, compensation), the database tests (cross-tenant CV metadata isolation and consent constraints), an emulated `storage.objects` policy-isolation test, and the jsdom card tests; full browser E2E of the live upload remains a hosted-test item.
+
+## 10. AI Candidate Insights (job match) — ADR-035/036/037
+
+**What leaves the server:** only for an application whose candidate has a CV and `cv_ai_authorized = true`, the extracted CV text plus the job title/description are sent to Azure OpenAI (`gpt-5-mini`, ADR-034) as delimited data blocks. CV text exists only in memory during a run; TalentFlow stores the validated structured result (`job-match-v1`), a SHA-256 `input_hash`, versions and timestamps — never the CV text, never the prompt. The result contains no score, ranking or hiring recommendation (the schema forbids extra keys; the three assessment statuses are the only verdicts, and `not_evidenced` means "no evidence in the provided material", not "lacks").
+
+**Authorization is checked four times:** at enqueue (user-scoped client, RLS), at claim (runner), immediately before the model call, and before persisting. Revoking authorization or deleting the CV clears every derived result (`status = revoked`, `result`/`summary` null) and makes a running analysis's completion write affect zero rows (`… WHERE status = 'analyzing'`). Deleting the candidate or the application cascades.
+
+**Tenant isolation:** `candidate_ai_insights` carries `organization_id` with the standard `can_access_org` policy; composite FKs `(candidate_id | job_id | application_id, organization_id)` make a cross-tenant link impossible. The runner is the only service-role consumer outside provisioning: it runs behind `POST /api/insights/run`, authenticated by `INSIGHTS_RUNNER_SECRET` (constant-time compare, 404 otherwise), accepts only an optional insight id, and scopes every statement by `organization_id`. The route is exempt from the session proxy because it authenticates itself.
+
+**Logging:** ids, outcomes, timings and sanitised error kinds (`AiError`, `InsightRunError`); unexpected errors are replaced by a generic message before persisting. Tests assert that no CV marker appears in any write or log (`tests/unit/insights-runner.test.ts`).
+
+**Audit:** `candidate.ai_insight_requested` (by the user), `candidate.ai_insight_ready` / `candidate.ai_insight_failed` (runner, null actor, ids only), `candidate.ai_insights_invalidated` (reason + count).
+
+**Flagged, not decided here:** Azure OpenAI's abuse-monitoring content retention (up to 30 days unless the resource is approved for no content logging) and the resource's region are not recorded in project documentation. The owner must confirm the resource's configuration and record it in this section before relying on the feature for real candidates (`docs/AI_INSIGHTS.md` §2).
+
+**Hosted setup (requires approval):** migrations `20261021130000_insights_enum.sql` and `20261021140000_insights_lifecycle.sql` via the approved push path; `INSIGHTS_RUNNER_SECRET` in the server environment; a scheduled call to the runner (`docs/DEPLOYMENT.md` §4.6).

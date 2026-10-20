@@ -54,6 +54,7 @@ TalentFlow is a real, production-oriented SaaS product for its first paying cust
 - URL state for filters (`?job=<id>&q=<name>`) so views are shareable.
 - Errors: return `{ status: "error", message, fieldErrors }` from actions for expected failures; throw only for bugs. Never leak other tenants' existence (same copy for hidden and missing).
 - Tests: `tests/unit` (pure logic, guards and actions with mocked clients), `tests/db` (RLS, embedded Postgres, scope assertions to the file's own seed ids), `tests/e2e` (Playwright). Name tests by behaviour, in English.
+- AI Candidate Insights: contracts, lifecycle and the runner are specified in `docs/AI_INSIGHTS.md` (ADR-035/036/037). The runner (`src/server/insights/runner.ts`, behind `POST /api/insights/run` + `INSIGHTS_RUNNER_SECRET`) is the only service-role consumer outside provisioning; it must keep scoping every statement by `organization_id` and re-checking `cv_ai_authorized` before any CV content is used.
 - Commits: imperative, scoped (`feat(auth): …`, `fix(rls): …`, `docs: …`). End with the attribution line required by the session.
 
 ## Phase gate checklist (run before reporting a phase complete)

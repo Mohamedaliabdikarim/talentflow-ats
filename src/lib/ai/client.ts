@@ -140,6 +140,55 @@ export type AiTextResult = {
   totalTokens: number | null;
 };
 
+export type AiStructuredResult = AiTextResult & {
+  /** True when the model hit the output-token limit before finishing (output is unusable). */
+  incomplete: boolean;
+};
+
+/**
+ * Structured generation over the Responses API: the model is constrained to `jsonSchema`
+ * (strict structured output). Returns the raw JSON text; the caller validates it against its
+ * own Zod contract before trusting it. Nothing here logs the input or the output.
+ */
+export async function generateStructured(params: {
+  input: string;
+  instructions?: string;
+  schemaName: string;
+  jsonSchema: Record<string, unknown>;
+  maxOutputTokens?: number;
+  signal?: AbortSignal;
+}): Promise<AiStructuredResult> {
+  const { client, deployment } = createAzureOpenAI();
+  try {
+    const response = await client.responses.create(
+      {
+        model: deployment,
+        input: params.input,
+        ...(params.instructions ? { instructions: params.instructions } : {}),
+        max_output_tokens: params.maxOutputTokens ?? 4096,
+        text: {
+          format: {
+            type: "json_schema",
+            name: params.schemaName,
+            schema: params.jsonSchema,
+            strict: true,
+          },
+        },
+      },
+      { signal: params.signal },
+    );
+    return {
+      text: response.output_text ?? "",
+      model: response.model,
+      outputTokens: response.usage?.output_tokens ?? null,
+      totalTokens: response.usage?.total_tokens ?? null,
+      incomplete: response.status === "incomplete",
+    };
+  } catch (error) {
+    throw mapAiError(error);
+  }
+}
+
 /**
  * Minimal text generation over the Responses API. Returns only the aggregated output text
  * and token usage; the caller is responsible for not passing sensitive content until the
