@@ -13,15 +13,15 @@
 
 ## 2. Environment variables
 
-| Name                                                                       | Scope       | Purpose                                                                                     |
-| -------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`                                                 | public      | Supabase project URL                                                                        |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY`                                            | public      | Anon (publishable) key; safe for the browser because RLS applies                            |
-| `SUPABASE_SERVICE_ROLE_KEY`                                                | server only | Provisioning operations; never exposed                                                      |
-| `NEXT_PUBLIC_APP_URL`                                                      | public      | Canonical URL used for auth redirects                                                       |
-| `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT` | server only | Optional AI feature                                                                         |
-| `INSIGHTS_RUNNER_SECRET`                                                   | server only | Shared secret for `POST /api/insights/run` (Candidate Insights runner, ADR-036); ≥ 16 chars |
-| `GITHUB_TOKEN`                                                             | server only | Optional; raises GitHub API rate limit                                                      |
+| Name                                                                       | Scope       | Purpose                                                                                                               |
+| -------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`                                                 | public      | Supabase project URL                                                                                                  |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`                                            | public      | Anon (publishable) key; safe for the browser because RLS applies                                                      |
+| `SUPABASE_SERVICE_ROLE_KEY`                                                | server only | Provisioning operations; never exposed                                                                                |
+| `NEXT_PUBLIC_APP_URL`                                                      | public      | Canonical URL used for auth redirects                                                                                 |
+| `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT` | server only | Optional AI feature                                                                                                   |
+| `INSIGHTS_RUNNER_SECRET`                                                   | server only | Shared secret for `POST /api/insights/run` (Candidate Insights runner, ADR-036); ≥ 16 chars                           |
+| `GITHUB_TOKEN`                                                             | server only | Optional fine-grained token (public read) for Candidate Insights GitHub evidence; raises the API rate limit (ADR-038) |
 
 `src/lib/env.ts` validates these at startup. `.env.example` lists names without values.
 

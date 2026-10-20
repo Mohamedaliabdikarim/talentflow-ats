@@ -146,6 +146,10 @@ export type Database = {
           started_at: string | null;
           attempt_count: number;
           contract_version: string | null;
+          evidence_sources: string[];
+          github_login: string | null;
+          github_status: string | null;
+          github_fetched_at: string | null;
         };
         Insert: {
           id?: string;
@@ -173,6 +177,10 @@ export type Database = {
           started_at?: string | null;
           attempt_count?: number;
           contract_version?: string | null;
+          evidence_sources?: string[];
+          github_login?: string | null;
+          github_status?: string | null;
+          github_fetched_at?: string | null;
         };
         Update: {
           id?: string;
@@ -200,6 +208,10 @@ export type Database = {
           started_at?: string | null;
           attempt_count?: number;
           contract_version?: string | null;
+          evidence_sources?: string[];
+          github_login?: string | null;
+          github_status?: string | null;
+          github_fetched_at?: string | null;
         };
         Relationships: [
           {
@@ -271,6 +283,10 @@ export type Database = {
           cv_ai_authorized_at: string | null;
           cv_ai_authorized_by: string | null;
           cv_ai_authorization_basis: string | null;
+          github_ai_authorized: boolean;
+          github_ai_authorized_at: string | null;
+          github_ai_authorized_by: string | null;
+          github_ai_authorization_basis: string | null;
         };
         Insert: {
           id?: string;
@@ -296,6 +312,10 @@ export type Database = {
           cv_ai_authorized_at?: string | null;
           cv_ai_authorized_by?: string | null;
           cv_ai_authorization_basis?: string | null;
+          github_ai_authorized?: boolean;
+          github_ai_authorized_at?: string | null;
+          github_ai_authorized_by?: string | null;
+          github_ai_authorization_basis?: string | null;
         };
         Update: {
           id?: string;
@@ -321,6 +341,10 @@ export type Database = {
           cv_ai_authorized_at?: string | null;
           cv_ai_authorized_by?: string | null;
           cv_ai_authorization_basis?: string | null;
+          github_ai_authorized?: boolean;
+          github_ai_authorized_at?: string | null;
+          github_ai_authorized_by?: string | null;
+          github_ai_authorization_basis?: string | null;
         };
         Relationships: [
           {
@@ -340,6 +364,13 @@ export type Database = {
           {
             foreignKeyName: "candidates_cv_uploaded_by_fkey";
             columns: ["cv_uploaded_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "candidates_github_ai_authorized_by_fkey";
+            columns: ["github_ai_authorized_by"];
             isOneToOne: false;
             referencedRelation: "users";
             referencedColumns: ["id"];

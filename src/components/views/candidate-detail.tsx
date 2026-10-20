@@ -30,6 +30,8 @@ type CandidateDetailViewProps = {
   dangerZone?: React.ReactNode;
   /** CV upload/consent card; rendered on the real detail page, omitted in the preview. */
   cvSection?: React.ReactNode;
+  /** GitHub evidence authorization card; rendered on the real detail page, omitted in the preview. */
+  githubSection?: React.ReactNode;
 };
 
 export function CandidateDetailView({
@@ -41,6 +43,7 @@ export function CandidateDetailView({
   renderApplicationLink,
   dangerZone,
   cvSection,
+  githubSection,
 }: CandidateDetailViewProps) {
   const facts: Array<[string, React.ReactNode]> = [
     ["Email", candidate.email ?? "—"],
@@ -143,6 +146,7 @@ export function CandidateDetailView({
         </div>
         <aside className="min-w-0 space-y-6">
           {cvSection}
+          {githubSection}
           <section className="rounded-lg border bg-card p-5">
             <h2 className="text-sm font-semibold">Profile</h2>
             <dl className="mt-3 space-y-3 text-sm">

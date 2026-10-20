@@ -95,7 +95,7 @@ export function ApplicationDetailView({
                 <dd>{application.candidate.cvPresent ? "Uploaded" : "Not uploaded"}</dd>
               </div>
               <div>
-                <dt className="text-xs text-muted-foreground">AI analysis</dt>
+                <dt className="text-xs text-muted-foreground">AI analysis of the CV</dt>
                 <dd>
                   {application.candidate.aiAuthorized
                     ? `Authorized${
@@ -106,10 +106,26 @@ export function ApplicationDetailView({
                     : "Not authorized"}
                 </dd>
               </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">GitHub evidence</dt>
+                <dd>
+                  {!application.candidate.githubUrl
+                    ? "No profile URL provided"
+                    : application.candidate.githubAiAuthorized
+                      ? `Authorized${
+                          application.candidate.githubAiAuthorizedAt
+                            ? ` ${formatDateTime(application.candidate.githubAiAuthorizedAt)}`
+                            : ""
+                        }`
+                      : "Profile provided, not authorized"}
+                </dd>
+              </div>
             </dl>
             <p className="mt-3 text-xs text-muted-foreground">
-              Authorization is recorded and revoked on the candidate page. Revoking removes any
-              generated insights.
+              Both authorizations are recorded and revoked on the candidate page. Revoking the CV
+              authorization removes every generated insight; revoking the GitHub authorization
+              removes the insights that used GitHub evidence. LinkedIn is a manual-review link only
+              and is never analysed.
             </p>
             <Button asChild variant="outline" size="sm" className="mt-3">
               <Link href={candidateHref}>Manage on candidate page</Link>

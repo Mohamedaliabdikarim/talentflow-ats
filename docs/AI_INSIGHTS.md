@@ -150,3 +150,100 @@ database tests (RLS, atomic claim, one-active-run index, revocation invalidation
 and `pnpm check`. The live Azure round-trip is exercised by `pnpm ai:smoke` (transport, ADR-034) and
 by the owner through the UI; it is not run in CI (paid API). This note does not claim production
 readiness; see `docs/DAILY_LOG.md` for recorded results.
+
+## 8. GitHub profile evidence (contract `job-match-v2`, ADR-038)
+
+**Status:** In progress (implementation, local only). Extends the job-match workflow with public
+GitHub evidence for candidates who provided a GitHub profile URL **and** whose recruiter recorded a
+separate, explicit authorization for it. CV behaviour is unchanged.
+
+### 8.1 Rules
+
+1. **Exact profile only.** The candidate's existing `github_url` field is the sole input. It is
+   parsed into one login (`https://github.com/<login>`); nothing is searched, guessed or
+   auto-corrected. A renamed account (the API answers with a different login) counts as _not
+   found_. Repository and organization paths are rejected by the existing validation.
+2. **Separate authorization.** New columns `github_ai_authorized`, `_at`, `_by`,
+   `github_ai_authorization_basis` on `candidates`, mirroring the CV consent columns: default
+   false, recorded through an unchecked confirmation plus a stated basis, revocable, impossible
+   without a URL (check constraint). Changing or removing the URL resets it, because an
+   authorization covers one exact profile.
+3. **Official API only, public data only.** `GET /users/{login}`,
+   `GET /users/{login}/repos?type=owner`, `GET /repos/{login}/{repo}/languages`,
+   `GET /repos/{login}/{repo}/readme` (raw). Forks are excluded (not the candidate's work). At most
+   8 repositories, 5 README excerpts of 2,500 characters, 24,000 characters in total. Optional
+   `GITHUB_TOKEN` raises the rate limit; the token never reaches a client. No `/search` endpoint
+   is ever called. LinkedIn stays a manual-review link.
+4. **Untrusted evidence.** Repository names, descriptions, topics and README text are wrapped in
+   delimited data blocks with delimiter tags neutralised, exactly like CV text; the instructions
+   say they are data, not instructions.
+5. **No proficiency claims.** The prompt states that a repository's existence or its languages is
+   evidence of _exposure_, not of proficiency, seniority or years of experience; star counts and
+   language percentages are deliberately not passed. No scores, no ranking, no decisions.
+6. **Graceful degradation.** No URL, an unparseable URL, no authorization, a 404, a rate limit or
+   any API failure never fails the run: the analysis proceeds CV-only and records why in
+   `github_status` so the UI can say so and offer Regenerate.
+7. **Retention.** Only the login, the repository URLs given to the model (`source_urls`) and
+   the structured result are stored. README text, descriptions and languages are not persisted.
+
+### 8.2 Contract A, version 2
+
+```jsonc
+{
+  "schema_version": "job-match-v2",
+  "summary": "string",
+  "github_overview": "string, empty when no GitHub evidence was provided",
+  "assessments": [
+    {
+      "requirement": "string",
+      "status": "supported | needs_verification | not_evidenced",
+      "evidence": [            // 1..4 items, each attributed to one source
+        { "source": "cv" | "github", "text": "string", "repository_url": "string | null" }
+      ]
+    }
+  ],
+  "interview_questions": ["string"],
+  "advisory_notice": "string"
+}
+```
+
+Server-side provenance enforcement after Zod validation: an evidence item with `source: "github"`
+when no GitHub evidence was provided fails the run (a fabricated attribution is never shown);
+a `repository_url` that is not one of the URLs given to the model is replaced by `null`; CV items
+never carry a repository URL. Stored `job-match-v1` results are normalised to the v2 shape when
+read (every v1 evidence string becomes one CV item), so earlier insights keep rendering.
+
+### 8.3 Contract B additions
+
+`candidate_ai_insights.evidence_sources text[]` (subset of `{cv, github}`), set to the _planned_
+sources at claim time and to the _actual_ sources when the result is persisted;
+`github_login`, `github_status` (`not_provided | invalid_url | not_authorized | included |
+not_found | rate_limited | unavailable | withdrawn`), `github_fetched_at`; `source_urls` holds
+the repository URLs given to the model.
+
+Revocation (ADR-037 extended): revoking **CV** authorization or deleting the CV still invalidates
+every insight of the candidate. Revoking **GitHub** authorization, or changing/removing the URL,
+invalidates only insights whose `evidence_sources` contain `github`, including runs in flight
+(their status-guarded completion then affects zero rows). The runner re-checks GitHub
+authorization before the model call (withdrawn → the GitHub block is dropped, CV-only) and before
+persisting (withdrawn after the model used GitHub → the result is discarded and the row is marked
+failed with a retry hint).
+
+### 8.4 UI
+
+Candidate page: a "GitHub evidence" card beside the CV card shows the profile link (manual
+review), the authorization state, the unchecked confirmation form and Revoke. Application page:
+each evidence item carries a source chip (CV / GitHub) and, for GitHub items, a link to the
+repository (new tab, `rel="noopener noreferrer"`); a "What the GitHub profile shows" section; a
+provenance footer listing the login and the repositories considered; a plain note when GitHub
+evidence was unavailable and why.
+
+### 8.5 Flagged, not decided here
+
+- **GitHub API terms and rate limits.** Unauthenticated calls are limited to 60 per hour per
+  IP; the optional `GITHUB_TOKEN` (a fine-grained token with public-read scope only) raises
+  this. Whether to provision one for the hosted environment is an owner decision
+  (`docs/DEPLOYMENT.md`).
+- **Candidate-facing transparency.** The authorization basis is recorded by the recruiter, as for
+  the CV. Whether candidates must be informed that their public GitHub activity was analysed is a
+  policy question outside this code.

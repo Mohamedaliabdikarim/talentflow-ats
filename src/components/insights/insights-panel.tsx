@@ -4,6 +4,8 @@ import {
   CircleCheck,
   CircleDashed,
   CircleQuestionMark,
+  FileText,
+  GitBranch,
   LoaderCircle,
   type LucideIcon,
   MessageCircleQuestionMark,
@@ -16,6 +18,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useId, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { cn } from "cn";
+import { ExternalLink } from "@/components/external-link";
 import { formatDateTime } from "@/components/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -26,18 +29,22 @@ import {
   ASSESSMENT_STATUS_LABELS,
   ASSESSMENT_STATUSES,
   type AssessmentStatus,
+  EVIDENCE_SOURCE_LABELS,
+  type EvidenceSource,
   type JobMatchResult,
 } from "@/lib/ai/insights-contract";
-import type { InsightView } from "@/server/data/insights";
+import type { GithubEvidenceStatus, InsightView } from "@/server/data/insights";
 import {
   generateApplicationInsightsAction,
   getApplicationInsightAction,
 } from "@/server/actions/insights";
 
 /**
- * Candidate Insights panel (ADR-035). States: not configured, CV missing, authorization required,
- * none yet, pending/analyzing (polls), ready, failed (retry), revoked. Every status is conveyed by
- * icon + text, never colour alone; the advisory notice is always visible with a result.
+ * Candidate Insights panel (ADR-035/038). States: not configured, CV missing, authorization
+ * required, none yet, pending/analyzing (polls), ready, failed (retry), revoked. Every status and
+ * every evidence source is conveyed by icon + text, never colour alone; the advisory notice is
+ * always visible with a result; repository links are rendered only from the URLs the model was
+ * given (validated server-side).
  */
 
 const POLL_INTERVAL_MS = 3_000;
@@ -69,6 +76,30 @@ const STATUS_PRESENTATION: Record<AssessmentStatus, { icon: LucideIcon; tone: st
   },
 };
 
+const SOURCE_PRESENTATION: Record<EvidenceSource, { icon: LucideIcon; tone: string }> = {
+  cv: { icon: FileText, tone: "bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-100" },
+  github: {
+    icon: GitBranch,
+    tone: "bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-100",
+  },
+};
+
+/** Reviewer-facing explanation when GitHub evidence was not part of a result. */
+const GITHUB_STATUS_NOTE: Partial<Record<GithubEvidenceStatus, string>> = {
+  invalid_url:
+    "GitHub evidence was not used: the stored URL is not a profile URL. Correct it on the candidate page.",
+  not_authorized:
+    "GitHub evidence was not used: the candidate has not authorized it. Record the authorization on the candidate page, then regenerate.",
+  not_found:
+    "GitHub evidence was not used: no account was found at the provided profile URL. Only the exact profile is ever used.",
+  rate_limited:
+    "GitHub evidence was not used: the GitHub API rate limit was reached. Regenerate later to include it.",
+  unavailable:
+    "GitHub evidence was not used: GitHub was unavailable. Regenerate later to include it.",
+  withdrawn:
+    "GitHub evidence was not used: its authorization was withdrawn while the analysis ran.",
+};
+
 function AssessmentStatusChip({ status }: { status: AssessmentStatus }) {
   const { icon: Icon, tone } = STATUS_PRESENTATION[status];
   return (
@@ -82,6 +113,27 @@ function AssessmentStatusChip({ status }: { status: AssessmentStatus }) {
       {ASSESSMENT_STATUS_LABELS[status]}
     </span>
   );
+}
+
+function SourceChip({ source }: { source: EvidenceSource }) {
+  const { icon: Icon, tone } = SOURCE_PRESENTATION[source];
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium whitespace-nowrap",
+        tone,
+      )}
+    >
+      <Icon className="size-3" aria-hidden="true" />
+      {EVIDENCE_SOURCE_LABELS[source]}
+    </span>
+  );
+}
+
+/** "owner/repo" for a GitHub repository URL; the full URL otherwise. */
+function repositoryLabel(url: string): string {
+  const match = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/?$/i.exec(url.trim());
+  return match ? match[1]! : url;
 }
 
 function isActive(status: InsightView["status"]): boolean {
@@ -212,6 +264,7 @@ export function InsightsPanel({
         ) : isActive(insight.status) ? (
           <Analyzing
             attempt={insight.attemptCount}
+            sources={insight.evidenceSources}
             exhausted={polls >= MAX_POLLS}
             onCheck={() => {
               setPolls(0);
@@ -237,12 +290,7 @@ export function InsightsPanel({
             </Button>
           </div>
         ) : insight.result ? (
-          <ReadyResult
-            result={insight.result}
-            generatedAt={insight.generatedAt}
-            model={insight.modelVersion}
-            contract={insight.contractVersion}
-          />
+          <ReadyResult insight={insight} result={insight.result} />
         ) : (
           <EmptyInsights onGenerate={generate} busy={isPending} />
         )}
@@ -281,8 +329,9 @@ function EmptyInsights({ onGenerate, busy }: { onGenerate: () => void; busy: boo
     <div className="space-y-3 rounded-lg border border-dashed p-5">
       <p className="text-sm font-medium">No insights yet</p>
       <p className="text-sm text-muted-foreground">
-        Analyse the authorized CV against this job&apos;s requirements. The result is advisory,
-        evidence-based and reviewed by you; it never scores or decides.
+        Analyse the authorized CV, and the authorized GitHub profile when there is one, against this
+        job&apos;s requirements. The result is advisory, evidence-based and reviewed by you; it
+        never scores or decides.
       </p>
       <Button onClick={onGenerate} disabled={busy}>
         {busy ? (
@@ -298,18 +347,23 @@ function EmptyInsights({ onGenerate, busy }: { onGenerate: () => void; busy: boo
 
 function Analyzing({
   attempt,
+  sources,
   exhausted,
   onCheck,
 }: {
   attempt: number;
+  sources: EvidenceSource[];
   exhausted: boolean;
   onCheck: () => void;
 }) {
+  const withGithub = sources.includes("github");
   return (
     <div className="space-y-4" role="status">
       <p className="flex items-center gap-2 text-sm font-medium">
         <LoaderCircle className="size-4 animate-spin text-primary" aria-hidden="true" />
-        Analysing the CV against this job…
+        {withGithub
+          ? "Analysing the CV and the GitHub profile against this job…"
+          : "Analysing the CV against this job…"}
         {attempt > 1 ? (
           <span className="text-xs font-normal text-muted-foreground">(attempt {attempt})</span>
         ) : null}
@@ -364,17 +418,10 @@ function Failed({
   );
 }
 
-function ReadyResult({
-  result,
-  generatedAt,
-  model,
-  contract,
-}: {
-  result: JobMatchResult;
-  generatedAt: string | null;
-  model: string | null;
-  contract: string | null;
-}) {
+function ReadyResult({ insight, result }: { insight: InsightView; result: JobMatchResult }) {
+  const githubIncluded = insight.githubStatus === "included" && insight.githubLogin !== null;
+  const githubNote = insight.githubStatus ? GITHUB_STATUS_NOTE[insight.githubStatus] : undefined;
+
   return (
     <div className="space-y-6">
       <Alert>
@@ -388,6 +435,28 @@ function ReadyResult({
         <p className="mt-1.5 text-sm leading-relaxed">{result.summary}</p>
       </div>
 
+      {githubIncluded && result.github_overview.length > 0 ? (
+        <div>
+          <h3 className="flex items-center gap-2 text-sm font-semibold">
+            <GitBranch className="size-4 text-muted-foreground" aria-hidden="true" />
+            What the GitHub profile shows
+          </h3>
+          <p className="mt-1.5 text-sm leading-relaxed">{result.github_overview}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Public repositories show exposure to a technology, not proficiency or seniority.
+          </p>
+        </div>
+      ) : null}
+
+      {githubNote ? (
+        <p
+          className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground"
+          data-testid="github-status-note"
+        >
+          {githubNote}
+        </p>
+      ) : null}
+
       <div>
         <h3 className="text-sm font-semibold">Job requirements</h3>
         <ul
@@ -400,7 +469,27 @@ function ReadyResult({
                 <p className="text-sm font-medium">{assessment.requirement}</p>
                 <AssessmentStatusChip status={assessment.status} />
               </div>
-              <p className="text-sm text-muted-foreground">{assessment.evidence}</p>
+              <div className="space-y-1">
+                {assessment.evidence.map((item, itemIndex) => (
+                  <p
+                    key={itemIndex}
+                    className="flex items-start gap-2 text-sm text-muted-foreground"
+                  >
+                    <SourceChip source={item.source} />
+                    <span>
+                      {item.text}
+                      {item.repository_url ? (
+                        <>
+                          {" "}
+                          <ExternalLink href={item.repository_url} className="text-xs">
+                            {repositoryLabel(item.repository_url)}
+                          </ExternalLink>
+                        </>
+                      ) : null}
+                    </span>
+                  </p>
+                ))}
+              </div>
             </li>
           ))}
         </ul>
@@ -436,12 +525,37 @@ function ReadyResult({
         </div>
       ) : null}
 
-      <p className="text-xs text-muted-foreground">
-        Generated {generatedAt ? formatDateTime(generatedAt) : "—"}
-        {model ? ` · model ${model}` : ""}
-        {contract ? ` · contract ${contract}` : ""}. Based only on the authorized CV and this
-        job&apos;s description.
-      </p>
+      <div className="space-y-1 text-xs text-muted-foreground" data-testid="insight-provenance">
+        <p>
+          Sources: the authorized CV
+          {githubIncluded ? (
+            <>
+              {" "}
+              and the public GitHub profile{" "}
+              <ExternalLink href={`https://github.com/${insight.githubLogin}`}>
+                @{insight.githubLogin}
+              </ExternalLink>
+            </>
+          ) : null}
+          . LinkedIn is never analysed.
+        </p>
+        {githubIncluded && insight.sourceUrls.length > 0 ? (
+          <p>
+            Repositories considered:{" "}
+            {insight.sourceUrls.map((url, index) => (
+              <span key={url}>
+                {index > 0 ? ", " : ""}
+                <ExternalLink href={url}>{repositoryLabel(url)}</ExternalLink>
+              </span>
+            ))}
+          </p>
+        ) : null}
+        <p>
+          Generated {insight.generatedAt ? formatDateTime(insight.generatedAt) : "—"}
+          {insight.modelVersion ? ` · model ${insight.modelVersion}` : ""}
+          {insight.contractVersion ? ` · contract ${insight.contractVersion}` : ""}.
+        </p>
+      </div>
     </div>
   );
 }

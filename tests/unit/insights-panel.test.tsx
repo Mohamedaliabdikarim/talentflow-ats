@@ -3,12 +3,14 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { JobMatchResult } from "@/lib/ai/insights-contract";
 import type { InsightView } from "@/server/data/insights";
 
 /**
- * Candidate Insights panel states (ADR-035 §7): not configured, no CV, authorization required,
- * none yet, analysing, ready, failed/retry, revoked. Server Actions are mocked; nothing calls
- * Azure. Status is always conveyed by icon + text, so the assertions are on text.
+ * Candidate Insights panel states (ADR-035/038): gates, lifecycle, and the v2 result with
+ * evidence attributed to the CV or GitHub, repository links only from the validated list, GitHub
+ * status notes and provenance. Server Actions are mocked; nothing calls Azure or GitHub. Status
+ * and source are always conveyed by icon + text, so the assertions are on text.
  */
 
 const generateApplicationInsightsAction = vi.fn();
@@ -25,6 +27,8 @@ vi.mock("next/link", () => ({
 }));
 
 const { InsightsPanel } = await import("@/components/insights/insights-panel");
+
+const REPO = "https://github.com/octocat/hello-world";
 
 const base = {
   orgSlug: "acme",
@@ -43,34 +47,72 @@ function insight(overrides: Partial<InsightView>): InsightView {
     errorMessage: null,
     generatedAt: "2026-10-21T10:00:00.000Z",
     modelVersion: "gpt-5-mini-2025-08-07",
-    contractVersion: "job-match-v1",
+    contractVersion: "job-match-v2",
     attemptCount: 1,
     createdAt: "2026-10-21T09:59:00.000Z",
     updatedAt: "2026-10-21T10:00:00.000Z",
+    evidenceSources: ["cv"],
+    githubLogin: null,
+    githubStatus: "not_provided",
+    sourceUrls: [],
     ...overrides,
   };
 }
 
-const READY = insight({
-  result: {
-    schema_version: "job-match-v1",
-    summary: "Several years of TypeScript; cloud experience is not evidenced in the CV.",
-    assessments: [
-      { requirement: "TypeScript", status: "supported", evidence: "Two recent roles list it." },
-      {
-        requirement: "Team leadership",
-        status: "needs_verification",
-        evidence: "Mentions mentoring juniors; no formal lead role.",
-      },
-      {
-        requirement: "Azure",
-        status: "not_evidenced",
-        evidence: "Nothing in the CV mentions Azure.",
-      },
-    ],
-    interview_questions: ["Which cloud platforms have you deployed to?"],
-    advisory_notice: "Advisory; a person reviews.",
-  },
+const CV_RESULT: JobMatchResult = {
+  schema_version: "job-match-v2",
+  summary: "Several years of TypeScript; cloud experience is not evidenced in the CV.",
+  github_overview: "",
+  assessments: [
+    {
+      requirement: "TypeScript",
+      status: "supported",
+      evidence: [{ source: "cv", text: "Two recent roles list it.", repository_url: null }],
+    },
+    {
+      requirement: "Team leadership",
+      status: "needs_verification",
+      evidence: [
+        {
+          source: "cv",
+          text: "Mentions mentoring juniors; no formal lead role.",
+          repository_url: null,
+        },
+      ],
+    },
+    {
+      requirement: "Azure",
+      status: "not_evidenced",
+      evidence: [{ source: "cv", text: "Nothing in the CV mentions Azure.", repository_url: null }],
+    },
+  ],
+  interview_questions: ["Which cloud platforms have you deployed to?"],
+  advisory_notice: "Advisory; a person reviews.",
+};
+
+const GITHUB_RESULT: JobMatchResult = {
+  ...CV_RESULT,
+  github_overview: "The hello-world repository shows exposure to TypeScript tooling.",
+  assessments: [
+    {
+      requirement: "TypeScript",
+      status: "supported",
+      evidence: [
+        { source: "cv", text: "Two recent roles list it.", repository_url: null },
+        { source: "github", text: "hello-world is written in TypeScript.", repository_url: REPO },
+      ],
+    },
+    ...CV_RESULT.assessments.slice(1),
+  ],
+};
+
+const READY_CV = insight({ result: CV_RESULT });
+const READY_GITHUB = insight({
+  result: GITHUB_RESULT,
+  evidenceSources: ["cv", "github"],
+  githubLogin: "octocat",
+  githubStatus: "included",
+  sourceUrls: [REPO, "https://github.com/octocat/old-lib"],
 });
 
 beforeEach(() => {
@@ -132,6 +174,20 @@ describe("InsightsPanel lifecycle", () => {
     );
   });
 
+  it("says when the GitHub profile is part of a running analysis", () => {
+    render(
+      <InsightsPanel
+        {...base}
+        initial={insight({
+          status: "analyzing",
+          evidenceSources: ["cv", "github"],
+          githubLogin: "octocat",
+        })}
+      />,
+    );
+    expect(screen.getByText(/Analysing the CV and the GitHub profile/)).toBeInTheDocument();
+  });
+
   it("shows the authorization error from the action without pretending to run", async () => {
     generateApplicationInsightsAction.mockResolvedValue({
       status: "error",
@@ -143,28 +199,81 @@ describe("InsightsPanel lifecycle", () => {
     expect(getApplicationInsightAction).not.toHaveBeenCalled();
   });
 
-  it("renders a ready result: advisory notice, summary, statuses with meaning, questions, provenance", () => {
-    render(<InsightsPanel {...base} initial={READY} />);
+  it("renders a CV-only result: advisory notice, summary, statuses with meaning, questions, provenance", () => {
+    render(<InsightsPanel {...base} initial={READY_CV} />);
     expect(screen.getByText("Advisory only — a person decides")).toBeInTheDocument();
-    expect(screen.getByText(READY.result!.summary)).toBeInTheDocument();
+    expect(screen.getByText(CV_RESULT.summary)).toBeInTheDocument();
 
     const list = screen.getByRole("list", { name: "Requirement assessments" });
     const items = within(list).getAllByRole("listitem");
     expect(items).toHaveLength(3);
     expect(items[0]).toHaveTextContent("TypeScript");
-    expect(items[0]).toHaveTextContent("Supported by CV");
+    expect(items[0]).toHaveTextContent("Supported");
+    expect(items[0]).toHaveTextContent("CV");
     expect(items[1]).toHaveTextContent("Needs verification");
-    expect(items[2]).toHaveTextContent("Not evidenced in CV");
+    expect(items[2]).toHaveTextContent("Not evidenced");
     expect(items[2]).toHaveTextContent("Nothing in the CV mentions Azure.");
 
-    // "Not evidenced" is explained as absence of evidence, never as a deficiency.
     expect(screen.getByText(/not a sign that the candidate lacks it/)).toBeInTheDocument();
     expect(screen.getByText("Which cloud platforms have you deployed to?")).toBeInTheDocument();
-    expect(screen.getByText(/model gpt-5-mini-2025-08-07/)).toBeInTheDocument();
-    expect(screen.getByText(/contract job-match-v1/)).toBeInTheDocument();
+    expect(screen.getByTestId("insight-provenance")).toHaveTextContent(
+      /Sources: the authorized CV/,
+    );
+    expect(screen.getByTestId("insight-provenance")).toHaveTextContent(
+      /LinkedIn is never analysed/,
+    );
+    expect(screen.getByTestId("insight-provenance")).not.toHaveTextContent(/GitHub profile/);
+    expect(screen.getByTestId("insight-provenance")).toHaveTextContent(/contract job-match-v2/);
+    expect(screen.queryByText("What the GitHub profile shows")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("github-status-note")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Regenerate" })).toBeInTheDocument();
     // No score, grade or recommendation anywhere.
     expect(screen.queryByText(/\b(score|\d+\/10|\d+%|recommend)\b/i)).not.toBeInTheDocument();
+  });
+
+  it("distinguishes GitHub evidence from CV evidence and links only to the repositories it was given", () => {
+    render(<InsightsPanel {...base} initial={READY_GITHUB} />);
+    const list = screen.getByRole("list", { name: "Requirement assessments" });
+    const first = within(list).getAllByRole("listitem")[0]!;
+    expect(first).toHaveTextContent("CV");
+    expect(first).toHaveTextContent("GitHub");
+    expect(first).toHaveTextContent("hello-world is written in TypeScript.");
+    const repoLink = within(first).getByRole("link", { name: /octocat\/hello-world/ });
+    expect(repoLink).toHaveAttribute("href", REPO);
+    expect(repoLink).toHaveAttribute("target", "_blank");
+    expect(repoLink).toHaveAttribute("rel", "noopener noreferrer");
+
+    expect(screen.getByText("What the GitHub profile shows")).toBeInTheDocument();
+    expect(screen.getByText(GITHUB_RESULT.github_overview)).toBeInTheDocument();
+    expect(screen.getByText(/exposure to a technology, not proficiency/)).toBeInTheDocument();
+
+    const provenance = screen.getByTestId("insight-provenance");
+    expect(within(provenance).getByRole("link", { name: /@octocat/ })).toHaveAttribute(
+      "href",
+      "https://github.com/octocat",
+    );
+    expect(provenance).toHaveTextContent(/Repositories considered/);
+    expect(within(provenance).getByRole("link", { name: /octocat\/old-lib/ })).toHaveAttribute(
+      "href",
+      "https://github.com/octocat/old-lib",
+    );
+    expect(provenance).toHaveTextContent(/LinkedIn is never analysed/);
+  });
+
+  it("explains why GitHub evidence was not used, without a GitHub section", () => {
+    render(
+      <InsightsPanel
+        {...base}
+        initial={insight({
+          result: CV_RESULT,
+          githubLogin: "octocat",
+          githubStatus: "rate_limited",
+        })}
+      />,
+    );
+    expect(screen.getByTestId("github-status-note")).toHaveTextContent(/rate limit was reached/);
+    expect(screen.queryByText("What the GitHub profile shows")).not.toBeInTheDocument();
+    expect(screen.getByTestId("insight-provenance")).not.toHaveTextContent(/GitHub profile/);
   });
 
   it("shows the failure message with a Retry that queues again", async () => {
@@ -194,14 +303,18 @@ describe("InsightsPanel lifecycle", () => {
     expect(await screen.findByText(/Analysing the CV/)).toBeInTheDocument();
   });
 
-  it("offers to generate again after a revocation once authorization is back", () => {
+  it("offers to generate again after a GitHub revocation while the CV authorization stands", () => {
     render(
       <InsightsPanel
         {...base}
-        initial={insight({ status: "revoked", errorMessage: "AI authorization was revoked." })}
+        initial={insight({
+          status: "revoked",
+          errorMessage:
+            "GitHub authorization was revoked, so insights that used GitHub evidence were removed.",
+        })}
       />,
     );
-    expect(screen.getByText("AI authorization was revoked.")).toBeInTheDocument();
+    expect(screen.getByText(/GitHub authorization was revoked/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Generate insights" })).toBeInTheDocument();
   });
 

@@ -2,15 +2,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createFakeSupabase, type FakeQuery, findFilter } from "./helpers/fake-supabase";
 
 /**
- * The insights runner (ADR-036): atomic claim, authorization re-checks before extraction, before
- * the model call and before persisting, status-guarded persist (no stale overwrite), sanitised
- * failures, stuck-run recovery and tenant scoping of every statement. Azure and the PDF
- * extractor are mocked; the fake client records every query.
+ * The insights runner (ADR-036/038): atomic claim with planned sources, authorization re-checks
+ * before extraction, before the model call and before persisting, GitHub evidence for the exact
+ * authorized login only with graceful degradation, status-guarded persist (no stale overwrite),
+ * sanitised failures, stuck-run recovery and tenant scoping of every statement. Azure, the PDF
+ * extractor and the GitHub fetcher are mocked; the fake client records every query.
  */
 
 vi.mock("server-only", () => ({}));
 
 const CV_MARKER = "CV-PRIVATE-MARKER-7f3a";
+const GH_MARKER = "GH-README-MARKER-91c2";
+const REPO = "https://github.com/octocat/hello-world";
 
 class InsightRunError extends Error {
   constructor(message: string) {
@@ -21,6 +24,9 @@ class InsightRunError extends Error {
 const extractCvText = vi.fn(async () => `Senior engineer. ${CV_MARKER}`);
 const analyzeJobMatch = vi.fn();
 vi.mock("@/lib/ai/job-match", () => ({ InsightRunError, extractCvText, analyzeJobMatch }));
+
+const fetchGithubEvidence = vi.fn();
+vi.mock("@/lib/github/evidence", () => ({ fetchGithubEvidence }));
 
 type Row = {
   id: string;
@@ -35,19 +41,38 @@ type Row = {
   [key: string]: unknown;
 };
 
-type Consent = { cv_object_key: string | null; cv_ai_authorized: boolean };
+type Consent = {
+  cv_object_key: string | null;
+  cv_ai_authorized: boolean;
+  github_url: string | null;
+  github_ai_authorized: boolean;
+};
+
+const CV_ONLY: Consent = {
+  cv_object_key: "org-1/cand-1/x.pdf",
+  cv_ai_authorized: true,
+  github_url: null,
+  github_ai_authorized: false,
+};
+const WITH_GITHUB: Consent = {
+  ...CV_ONLY,
+  github_url: "https://github.com/octocat",
+  github_ai_authorized: true,
+};
+const GITHUB_NOT_AUTHORIZED: Consent = { ...WITH_GITHUB, github_ai_authorized: false };
+const CV_REVOKED: Consent = { ...CV_ONLY, cv_ai_authorized: false };
 
 const state: {
   row: Row;
   candidate: Consent;
-  /** Per-read overrides of the candidate consent, consumed in order (simulates revocation). */
+  /** Per-read overrides of the consent, consumed in order (simulates revocation mid-run). */
   consentSequence: Array<Consent | null>;
   job: { title: string; description: string | null } | null;
   stuck: string[];
   pending: string[];
 } = {
   row: {} as Row,
-  candidate: { cv_object_key: "org-1/cand-1/x.pdf", cv_ai_authorized: true },
+  candidate: CV_ONLY,
   consentSequence: [],
   job: { title: "Fullstack Developer", description: "TypeScript and Azure." },
   stuck: [],
@@ -70,7 +95,6 @@ function resolve(query: FakeQuery) {
       const values = query.values as Record<string, unknown>;
       updates.push({ values, query });
       if (!findFilter(query, "id")) {
-        // List-shaped housekeeping: stuck recovery or superseding older results.
         if (findFilter(query, "started_at", "lt")) {
           return { data: state.stuck.map((id) => ({ id })), error: null };
         }
@@ -107,15 +131,45 @@ const fake = createFakeSupabase(resolve, {
 vi.mock("@/lib/supabase/admin", () => ({ createAdminSupabase: () => fake.client }));
 
 const { AiError } = await import("@/lib/ai/client");
-const { processInsight, recoverStuckRuns, runPendingInsights, safeFailureMessage } =
-  await import("@/server/insights/runner");
+const {
+  planGithubEvidence,
+  processInsight,
+  recoverStuckRuns,
+  runPendingInsights,
+  safeFailureMessage,
+} = await import("@/server/insights/runner");
 
 const RESULT = {
-  schema_version: "job-match-v1",
+  schema_version: "job-match-v2",
   summary: "Strong TypeScript evidence; Azure not evidenced.",
-  assessments: [{ requirement: "TypeScript", status: "supported", evidence: "Recent roles." }],
+  github_overview: "",
+  assessments: [
+    {
+      requirement: "TypeScript",
+      status: "supported",
+      evidence: [{ source: "cv", text: "Recent roles.", repository_url: null }],
+    },
+  ],
   interview_questions: ["Which cloud platforms have you used?"],
   advisory_notice: "Advisory; a person reviews.",
+};
+
+const INCLUDED_EVIDENCE = {
+  status: "included",
+  login: "octocat",
+  profileUrl: "https://github.com/octocat",
+  repositories: [
+    {
+      name: "hello-world",
+      url: REPO,
+      description: "Says hello",
+      languages: ["TypeScript"],
+      topics: [],
+      pushedAt: "2026-09-01T10:00:00Z",
+      readmeExcerpt: `Readme ${GH_MARKER}`,
+    },
+  ],
+  fetchedAt: "2026-10-21T12:00:00.000Z",
 };
 
 let errors: ReturnType<typeof vi.spyOn>;
@@ -131,7 +185,7 @@ beforeEach(() => {
     attempt_count: 0,
     analysis_type: "job_match",
   };
-  state.candidate = { cv_object_key: "org-1/cand-1/x.pdf", cv_ai_authorized: true };
+  state.candidate = CV_ONLY;
   state.consentSequence = [];
   state.job = { title: "Fullstack Developer", description: "TypeScript and Azure." };
   state.stuck = [];
@@ -142,13 +196,19 @@ beforeEach(() => {
   fake.queries.length = 0;
   extractCvText.mockClear();
   analyzeJobMatch.mockReset();
-  analyzeJobMatch.mockResolvedValue({
-    result: RESULT,
-    model: "gpt-5-mini-2025-08-07",
-    inputHash: "a".repeat(64),
-    promptVersion: "job-match-prompt-2026-10-20",
-    contractVersion: "job-match-v1",
-  });
+  analyzeJobMatch.mockImplementation(
+    async ({ github }: { github: { repositories: Array<{ url: string }> } | null }) => ({
+      result: { ...RESULT, github_overview: github ? "Shows TypeScript exposure." : "" },
+      model: "gpt-5-mini-2025-08-07",
+      inputHash: "a".repeat(64),
+      promptVersion: "job-match-prompt-v2-2026-10-21",
+      contractVersion: "job-match-v2",
+      evidenceSources: github ? ["cv", "github"] : ["cv"],
+      repositoryUrls: github ? github.repositories.map((r) => r.url) : [],
+    }),
+  );
+  fetchGithubEvidence.mockReset();
+  fetchGithubEvidence.mockResolvedValue(INCLUDED_EVIDENCE);
   errors = vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -156,38 +216,74 @@ function allWrittenText(): string {
   return JSON.stringify({ updates, audits, logs: errors.mock.calls });
 }
 
-describe("processInsight — happy path", () => {
-  it("claims, checks authorization three times, analyses, and persists a ready result", async () => {
+function claimUpdate() {
+  return updates.find((u) => u.values.status === "analyzing")!;
+}
+function readyUpdate() {
+  return updates.find((u) => u.values.status === "ready");
+}
+
+describe("planGithubEvidence", () => {
+  it("maps the authorization state to a plan without guessing", () => {
+    expect(planGithubEvidence({ githubUrl: null, githubAuthorized: true })).toEqual({
+      status: "not_provided",
+      login: null,
+    });
+    expect(
+      planGithubEvidence({ githubUrl: "https://github.com/octocat/repo", githubAuthorized: true }),
+    ).toEqual({ status: "invalid_url", login: null });
+    expect(
+      planGithubEvidence({ githubUrl: "https://github.com/octocat", githubAuthorized: false }),
+    ).toEqual({
+      status: "not_authorized",
+      login: "octocat",
+    });
+    expect(
+      planGithubEvidence({ githubUrl: "https://github.com/octocat", githubAuthorized: true }),
+    ).toEqual({
+      status: "planned",
+      login: "octocat",
+    });
+  });
+});
+
+describe("processInsight — CV-only (no GitHub profile)", () => {
+  it("claims, checks authorization four times, analyses the CV only, and persists a ready result", async () => {
     const outcome = await processInsight("ins-1");
     expect(outcome).toEqual({ insightId: "ins-1", outcome: "ready" });
 
-    // Atomic claim: pending → analyzing with the attempt counter incremented.
-    expect(updates[0]!.values).toMatchObject({ status: "analyzing", attempt_count: 1 });
-    expect(findFilter(updates[0]!.query, "status")?.value).toBe("pending");
+    expect(claimUpdate().values).toMatchObject({
+      status: "analyzing",
+      attempt_count: 1,
+      evidence_sources: ["cv"],
+      github_login: null,
+      github_status: "not_provided",
+    });
+    expect(findFilter(claimUpdate().query, "status")?.value).toBe("pending");
 
-    const consentReads = fake.queries.filter((q) => q.table === "candidates");
-    expect(consentReads).toHaveLength(3);
+    expect(fake.queries.filter((q) => q.table === "candidates")).toHaveLength(4);
     expect(downloads).toEqual(["org-1/cand-1/x.pdf"]);
-    expect(extractCvText).toHaveBeenCalledTimes(1);
+    expect(fetchGithubEvidence).not.toHaveBeenCalled();
     expect(analyzeJobMatch).toHaveBeenCalledWith({
       jobTitle: "Fullstack Developer",
       jobDescription: "TypeScript and Azure.",
       cvText: `Senior engineer. ${CV_MARKER}`,
+      github: null,
     });
 
-    const persist = updates.find((u) => u.values.status === "ready")!;
+    const persist = readyUpdate()!;
     expect(persist.values).toMatchObject({
-      result: RESULT,
       summary: RESULT.summary,
       model_version: "gpt-5-mini-2025-08-07",
-      prompt_version: "job-match-prompt-2026-10-20",
-      contract_version: "job-match-v1",
-      input_hash: "a".repeat(64),
+      contract_version: "job-match-v2",
+      evidence_sources: ["cv"],
+      github_status: "not_provided",
+      github_login: null,
+      github_fetched_at: null,
+      source_urls: [],
       human_review_required: true,
       error_message: null,
     });
-    expect(typeof persist.values.generated_at).toBe("string");
-    // Guarded write: only an analyzing row of this tenant can be completed.
     expect(findFilter(persist.query, "status")?.value).toBe("analyzing");
     expect(findFilter(persist.query, "organization_id")?.value).toBe("org-1");
 
@@ -201,6 +297,7 @@ describe("processInsight — happy path", () => {
         organization_id: "org-1",
         action: "candidate.ai_insight_ready",
         target_id: "ins-1",
+        metadata: expect.objectContaining({ evidence_sources: ["cv"] }),
       }),
     ]);
   });
@@ -222,6 +319,131 @@ describe("processInsight — happy path", () => {
   });
 });
 
+describe("processInsight — GitHub evidence", () => {
+  it("fetches the exact authorized login, passes the evidence to the model and records provenance", async () => {
+    state.candidate = WITH_GITHUB;
+    const outcome = await processInsight("ins-1");
+    expect(outcome).toEqual({ insightId: "ins-1", outcome: "ready" });
+
+    expect(claimUpdate().values).toMatchObject({
+      evidence_sources: ["cv", "github"],
+      github_login: "octocat",
+      github_status: null,
+    });
+    expect(fetchGithubEvidence).toHaveBeenCalledTimes(1);
+    expect(fetchGithubEvidence.mock.calls[0]![0]).toBe("octocat");
+    expect(analyzeJobMatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        github: {
+          login: "octocat",
+          profileUrl: "https://github.com/octocat",
+          repositories: INCLUDED_EVIDENCE.repositories,
+        },
+      }),
+    );
+    expect(readyUpdate()!.values).toMatchObject({
+      evidence_sources: ["cv", "github"],
+      github_login: "octocat",
+      github_status: "included",
+      github_fetched_at: "2026-10-21T12:00:00.000Z",
+      source_urls: [REPO],
+    });
+    expect(audits[0]!.metadata).toMatchObject({
+      evidence_sources: ["cv", "github"],
+      github_status: "included",
+    });
+  });
+
+  it("never writes or logs GitHub README content", async () => {
+    state.candidate = WITH_GITHUB;
+    await processInsight("ins-1");
+    expect(allWrittenText()).not.toContain(GH_MARKER);
+  });
+
+  it("does not fetch when the profile is present but not authorized", async () => {
+    state.candidate = GITHUB_NOT_AUTHORIZED;
+    await processInsight("ins-1");
+    expect(fetchGithubEvidence).not.toHaveBeenCalled();
+    expect(analyzeJobMatch).toHaveBeenCalledWith(expect.objectContaining({ github: null }));
+    expect(readyUpdate()!.values).toMatchObject({
+      evidence_sources: ["cv"],
+      github_login: "octocat",
+      github_status: "not_authorized",
+      source_urls: [],
+    });
+  });
+
+  it("does not fetch for an invalid profile URL even when authorized", async () => {
+    state.candidate = { ...WITH_GITHUB, github_url: "https://github.com/octocat/some-repo" };
+    await processInsight("ins-1");
+    expect(fetchGithubEvidence).not.toHaveBeenCalled();
+    expect(readyUpdate()!.values).toMatchObject({
+      github_status: "invalid_url",
+      github_login: null,
+    });
+  });
+
+  it.each(["not_found", "rate_limited", "unavailable"] as const)(
+    "degrades to a CV-only result when GitHub reports %s",
+    async (status) => {
+      state.candidate = WITH_GITHUB;
+      fetchGithubEvidence.mockResolvedValueOnce({ status, login: "octocat", message: "x" });
+      const outcome = await processInsight("ins-1");
+      expect(outcome).toEqual({ insightId: "ins-1", outcome: "ready" });
+      expect(analyzeJobMatch).toHaveBeenCalledWith(expect.objectContaining({ github: null }));
+      expect(readyUpdate()!.values).toMatchObject({
+        evidence_sources: ["cv"],
+        github_status: status,
+        github_login: "octocat",
+        github_fetched_at: null,
+        source_urls: [],
+      });
+    },
+  );
+
+  it("drops GitHub evidence when its authorization is withdrawn before the model call", async () => {
+    state.candidate = WITH_GITHUB;
+    state.consentSequence = [
+      WITH_GITHUB,
+      WITH_GITHUB,
+      GITHUB_NOT_AUTHORIZED,
+      GITHUB_NOT_AUTHORIZED,
+    ];
+    const outcome = await processInsight("ins-1");
+    expect(outcome).toEqual({ insightId: "ins-1", outcome: "ready" });
+    expect(fetchGithubEvidence).toHaveBeenCalledTimes(1);
+    expect(analyzeJobMatch).toHaveBeenCalledWith(expect.objectContaining({ github: null }));
+    expect(readyUpdate()!.values).toMatchObject({
+      evidence_sources: ["cv"],
+      github_status: "withdrawn",
+      github_fetched_at: null,
+    });
+  });
+
+  it("discards the result and marks the run failed when GitHub authorization is withdrawn after the model call", async () => {
+    state.candidate = WITH_GITHUB;
+    state.consentSequence = [WITH_GITHUB, WITH_GITHUB, WITH_GITHUB, GITHUB_NOT_AUTHORIZED];
+    const outcome = await processInsight("ins-1");
+    expect(outcome).toMatchObject({ insightId: "ins-1", outcome: "failed" });
+    expect(analyzeJobMatch).toHaveBeenCalledWith(
+      expect.objectContaining({ github: expect.anything() }),
+    );
+    expect(readyUpdate()).toBeUndefined();
+    expect(state.row).toMatchObject({ status: "failed" });
+    expect(String(state.row.error_message)).toMatch(/GitHub authorization was withdrawn/);
+    expect(allWrittenText()).not.toContain(GH_MARKER);
+  });
+
+  it("treats a changed profile URL mid-run as withdrawn (exact profile only)", async () => {
+    state.candidate = WITH_GITHUB;
+    const other = { ...WITH_GITHUB, github_url: "https://github.com/someone-else" };
+    state.consentSequence = [WITH_GITHUB, WITH_GITHUB, other, other];
+    await processInsight("ins-1");
+    expect(analyzeJobMatch).toHaveBeenCalledWith(expect.objectContaining({ github: null }));
+    expect(readyUpdate()!.values).toMatchObject({ github_status: "withdrawn" });
+  });
+});
+
 describe("processInsight — claim and idempotency", () => {
   it("does not process a row that is not pending (already claimed or terminal)", async () => {
     state.row.status = "analyzing";
@@ -240,9 +462,9 @@ describe("processInsight — claim and idempotency", () => {
   });
 });
 
-describe("processInsight — authorization and revocation", () => {
+describe("processInsight — CV authorization and revocation", () => {
   it("stops before reading the CV when authorization is absent at execution time", async () => {
-    state.candidate.cv_ai_authorized = false;
+    state.candidate = CV_REVOKED;
     const outcome = await processInsight("ins-1");
     expect(outcome).toEqual({ insightId: "ins-1", outcome: "revoked" });
     expect(downloads).toHaveLength(0);
@@ -251,10 +473,7 @@ describe("processInsight — authorization and revocation", () => {
   });
 
   it("stops before the model call when authorization is withdrawn after extraction", async () => {
-    state.consentSequence = [
-      { cv_object_key: "org-1/cand-1/x.pdf", cv_ai_authorized: true },
-      { cv_object_key: "org-1/cand-1/x.pdf", cv_ai_authorized: false },
-    ];
+    state.consentSequence = [CV_ONLY, CV_ONLY, CV_REVOKED];
     const outcome = await processInsight("ins-1");
     expect(outcome).toEqual({ insightId: "ins-1", outcome: "revoked" });
     expect(extractCvText).toHaveBeenCalledTimes(1);
@@ -263,20 +482,15 @@ describe("processInsight — authorization and revocation", () => {
   });
 
   it("discards the result when authorization is withdrawn after the model call", async () => {
-    state.consentSequence = [
-      { cv_object_key: "org-1/cand-1/x.pdf", cv_ai_authorized: true },
-      { cv_object_key: "org-1/cand-1/x.pdf", cv_ai_authorized: true },
-      { cv_object_key: "org-1/cand-1/x.pdf", cv_ai_authorized: false },
-    ];
+    state.consentSequence = [CV_ONLY, CV_ONLY, CV_ONLY, CV_REVOKED];
     const outcome = await processInsight("ins-1");
     expect(outcome).toEqual({ insightId: "ins-1", outcome: "revoked" });
     expect(analyzeJobMatch).toHaveBeenCalledTimes(1);
-    expect(updates.some((u) => u.values.status === "ready")).toBe(false);
+    expect(readyUpdate()).toBeUndefined();
     expect(state.row.result ?? null).toBeNull();
   });
 
   it("discards a stale result when the row changed during analysis (guarded write)", async () => {
-    // A concurrent revocation flips the row while the model is running.
     analyzeJobMatch.mockImplementationOnce(async () => {
       state.row.status = "revoked";
       state.row.result = null;
@@ -285,7 +499,9 @@ describe("processInsight — authorization and revocation", () => {
         model: "m",
         inputHash: "b".repeat(64),
         promptVersion: "p",
-        contractVersion: "job-match-v1",
+        contractVersion: "job-match-v2",
+        evidenceSources: ["cv"],
+        repositoryUrls: [],
       };
     });
     const outcome = await processInsight("ins-1");
@@ -300,7 +516,7 @@ describe("processInsight — authorization and revocation", () => {
   });
 
   it("refuses a CV key that is not inside the tenant's folder", async () => {
-    state.candidate.cv_object_key = "org-2/cand-9/y.pdf";
+    state.candidate = { ...CV_ONLY, cv_object_key: "org-2/cand-9/y.pdf" };
     const outcome = await processInsight("ins-1");
     expect(outcome).toMatchObject({ outcome: "failed" });
     expect(downloads).toHaveLength(0);

@@ -49,7 +49,9 @@ export function createFakeSupabase(
       query.filters.push({ method, column, value });
       return chain;
     };
-    for (const method of ["eq", "neq", "in", "lt", "gt", "ilike"]) chain[method] = filter(method);
+    for (const method of ["eq", "neq", "in", "lt", "gt", "ilike", "contains"]) {
+      chain[method] = filter(method);
+    }
     chain.select = (columns?: string) => {
       query.selected = columns;
       return chain;

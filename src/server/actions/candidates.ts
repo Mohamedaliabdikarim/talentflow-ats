@@ -15,6 +15,7 @@ import {
 import { runAction } from "@/server/actions/run";
 import { recordAuditEvent } from "@/server/audit";
 import { requireOrgAccess } from "@/server/auth";
+import { invalidateCandidateInsights } from "@/server/insights/invalidate";
 
 const TEXT_FIELDS = [
   "fullName",
@@ -194,15 +195,53 @@ export async function updateCandidateAction(
       );
     }
     const supabase = await createServerSupabase();
+    // A GitHub authorization covers one exact profile (ADR-038): when the URL changes or is
+    // removed, the authorization is reset and GitHub-sourced insights are invalidated.
+    const { data: current, error: lookupError } = await supabase
+      .from("candidates")
+      .select("github_url, github_ai_authorized")
+      .eq("id", candidateId)
+      .eq("organization_id", organization.id)
+      .maybeSingle();
+    if (lookupError) throw new Error(`candidate lookup failed: ${lookupError.message}`);
+    if (!current) return errorState("This candidate no longer exists");
+    const nextGithubUrl = parsed.data.githubUrl ?? null;
+    const githubUrlChanged = (current.github_url ?? null) !== nextGithubUrl;
+
     const { data, error } = await supabase
       .from("candidates")
-      .update(toRow(parsed.data))
+      .update({
+        ...toRow(parsed.data),
+        ...(githubUrlChanged
+          ? {
+              github_ai_authorized: false,
+              github_ai_authorized_at: null,
+              github_ai_authorized_by: null,
+              github_ai_authorization_basis: null,
+            }
+          : {}),
+      })
       .eq("id", candidateId)
       .eq("organization_id", organization.id)
       .select("id")
       .maybeSingle();
     if (error) throw new Error(`candidate update failed: ${error.message}`);
     if (!data) return errorState("This candidate no longer exists");
+
+    if (githubUrlChanged && current.github_ai_authorized) {
+      await invalidateCandidateInsights(
+        supabase,
+        organization.id,
+        candidateId,
+        "github_url_changed",
+      );
+      await recordAuditEvent("candidate.github_ai_revoked", {
+        organizationId: organization.id,
+        targetType: "candidate",
+        targetId: candidateId,
+        metadata: { reason: "url_changed" },
+      });
+    }
     revalidateWorkspace(orgSlug);
     redirect(`/o/${orgSlug}/candidates/${candidateId}`);
   });

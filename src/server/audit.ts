@@ -14,6 +14,8 @@ export type AuditAction =
   | "candidate.cv_deleted"
   | "candidate.cv_ai_authorized"
   | "candidate.cv_ai_revoked"
+  | "candidate.github_ai_authorized"
+  | "candidate.github_ai_revoked"
   | "candidate.ai_insight_requested"
   | "candidate.ai_insight_ready"
   | "candidate.ai_insight_failed"

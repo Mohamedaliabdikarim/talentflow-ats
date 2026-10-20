@@ -126,6 +126,10 @@ const candidate = (
   cv_ai_authorized_at: null,
   cv_ai_authorized_by: null,
   cv_ai_authorization_basis: null,
+  github_ai_authorized: false,
+  github_ai_authorized_at: null,
+  github_ai_authorized_by: null,
+  github_ai_authorization_basis: null,
   ...fields,
 });
 
