@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { revealAll } from "./helpers/reveal";
 
 /** Public landing page at "/": content, CTAs, navigation, the inert product showcase, a11y. */
 
@@ -60,26 +61,7 @@ test("no detectable accessibility violations on the landing page", async ({ page
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   // Reveal every section and let entrance animations finish: axe samples computed colours,
   // and a half-faded button or paragraph would be reported as low contrast (seen in CI).
-  await page.evaluate(async () => {
-    const step = Math.max(400, window.innerHeight * 0.8);
-    for (let y = 0; y < document.body.scrollHeight; y += step) {
-      window.scrollTo(0, y);
-      await new Promise((resolve) => setTimeout(resolve, 60));
-    }
-    window.scrollTo(0, 0);
-  });
-  await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () =>
-            Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]")).filter(
-              (element) => Number(getComputedStyle(element).opacity) < 1,
-            ).length,
-        ),
-      { timeout: 10_000 },
-    )
-    .toBe(0);
+  await revealAll(page);
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
     .analyze();
