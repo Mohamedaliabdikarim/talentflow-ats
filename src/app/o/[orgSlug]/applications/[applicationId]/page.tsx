@@ -21,9 +21,13 @@ export default async function ApplicationDetailPage({
   const organization = await getOrganizationContext(orgSlug);
   if (!organization) return <PermissionDenied />;
 
-  const application = await getApplicationDetail(organization.id, applicationId);
+  // Both reads are RLS-scoped by organization and keyed by the route id, so they run in one
+  // round trip (ADR-042); a missing application still ends in notFound().
+  const [application, insight] = await Promise.all([
+    getApplicationDetail(organization.id, applicationId),
+    getLatestApplicationInsight(organization.id, applicationId),
+  ]);
   if (!application) notFound();
-  const insight = await getLatestApplicationInsight(organization.id, application.id);
 
   return (
     <ApplicationDetailView

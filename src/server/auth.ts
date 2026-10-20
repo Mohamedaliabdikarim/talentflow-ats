@@ -144,26 +144,37 @@ export const getOrganizationContext = cache(
     const user = await getCurrentUser();
     if (!user) return null;
     const supabase = await createServerSupabase();
-    const { data: organization, error } = await supabase
-      .from("organizations")
-      .select("id, name, slug, status")
-      .eq("slug", slug)
-      .maybeSingle();
-    if (error) throw new Error(`Could not load organization: ${error.message}`);
-    if (!organization) return null;
-
-    const [admin, membership] = await Promise.all([
+    // One database round trip after the user check (ADR-042): the organization lookup (RLS
+    // decides visibility), the platform-admin flag and the caller's active membership are
+    // independent of each other. The membership is joined to the organization by slug
+    // (`!inner`, so a non-matching slug yields no row) instead of waiting for the organization
+    // id. The semantics are unchanged: the organization must be visible, and the caller must be
+    // a platform admin or an active member.
+    const [organizationResult, admin, membershipResult] = await Promise.all([
+      supabase
+        .from("organizations")
+        .select("id, name, slug, status")
+        .eq("slug", slug)
+        .maybeSingle(),
       isPlatformAdmin(),
       supabase
         .from("organization_memberships")
-        .select("role")
-        .eq("organization_id", organization.id)
+        .select("role, organizations!inner(id)")
         .eq("user_id", user.id)
         .eq("status", "active")
+        .eq("organizations.slug", slug)
         .maybeSingle(),
     ]);
+    if (organizationResult.error) {
+      throw new Error(`Could not load organization: ${organizationResult.error.message}`);
+    }
+    const organization = organizationResult.data;
+    if (!organization) return null;
+    if (membershipResult.error) {
+      throw new Error(`Could not load membership: ${membershipResult.error.message}`);
+    }
 
-    const role = membership.data?.role ?? null;
+    const role = membershipResult.data?.role ?? null;
     if (!admin && role === null) return null;
 
     return {

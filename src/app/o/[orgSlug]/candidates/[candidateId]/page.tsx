@@ -26,13 +26,15 @@ export default async function CandidateDetailPage({
   const { orgSlug, candidateId } = await params;
   const organization = await getOrganizationContext(orgSlug);
   if (!organization) return <PermissionDenied />;
-  const candidate = await getCandidate(organization.id, candidateId);
-  if (!candidate) notFound();
-
-  const [applications, jobs] = await Promise.all([
-    listCandidateApplications(organization.id, candidate.id),
+  // The candidate, their applications and the job options are independent, RLS-scoped reads
+  // keyed by the route id, so they run in one round trip (ADR-042); a missing candidate still
+  // ends in notFound() and the other results are discarded.
+  const [candidate, applications, jobs] = await Promise.all([
+    getCandidate(organization.id, candidateId),
+    listCandidateApplications(organization.id, candidateId),
     listJobOptions(organization.id),
   ]);
+  if (!candidate) notFound();
   const appliedJobIds = new Set(applications.map((application) => application.job.id));
   const jobOptions = jobs
     .filter((job) => job.status !== "closed" && !appliedJobIds.has(job.id))

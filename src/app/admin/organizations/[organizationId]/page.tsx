@@ -18,9 +18,12 @@ export default async function OrganizationDetailPage({
   params: Promise<{ organizationId: string }>;
 }) {
   const { organizationId } = await params;
-  const organization = await getOrganizationById(organizationId);
+  // Independent reads under the admin's RLS view run in one round trip (ADR-042).
+  const [organization, members] = await Promise.all([
+    getOrganizationById(organizationId),
+    listOrganizationMembers(organizationId),
+  ]);
   if (!organization) notFound();
-  const members = await listOrganizationMembers(organization.id);
 
   return (
     <FadeIn>

@@ -42,8 +42,13 @@ export type AuditDetails = {
  * Best-effort: a failed audit write is logged and does not undo the action, because the
  * action and the audit row cannot share a transaction across the Auth API and PostgreSQL.
  */
-export async function recordAuditEvent(action: AuditAction, details: AuditDetails = {}) {
-  const supabase = await createServerSupabase();
+export async function recordAuditEvent(
+  action: AuditAction,
+  details: AuditDetails = {},
+  /** A client created during the request, for callers that run after the response (ADR-042). */
+  client?: Awaited<ReturnType<typeof createServerSupabase>>,
+) {
+  const supabase = client ?? (await createServerSupabase());
   const { error } = await supabase.rpc("log_audit_event", {
     p_action: action,
     p_organization_id: details.organizationId ?? undefined,

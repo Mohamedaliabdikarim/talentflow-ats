@@ -1179,3 +1179,49 @@ Docs: ADR-040, `docs/SECURITY.md` §4 table, `docs/TEST_PLAN.md` T49–T50, `doc
 | `pnpm build`     | pass; `serverActions` listed among the experimental options in use |
 
 Docs: ADR-041, `docs/SECURITY.md` §9, `docs/DEPLOYMENT.md` §2. Pushed together with 94964e9 (membership management); CI result recorded in the final report of this session.
+
+## 2026-10-21 (continued) — Navigation performance: root causes and small safe fixes (ADR-042)
+
+**Symptom:** the production deployment at talentflow-ats-two.vercel.app felt slow between pages.
+
+**Root causes found (before any change):**
+
+1. **Function region far from the database.** `X-Vercel-Id: arn1::iad1::…` on production responses: the edge served from Stockholm but the function ran in Washington (`iad1`), while the Supabase project is in `eu-west-1` (Ireland, from the pooler host region). Every database or Auth round trip crossed the Atlantic.
+2. **Sequential round trips per navigation.** Session check (`auth.getUser`) → organization by slug → (platform-admin flag ∥ membership) → page data, with dependent chains on some pages (candidate: candidate → applications ∥ job options → recorder profile; application: detail → insight; admin organization: organization → memberships → profiles). Five to seven sequential hops per navigation; measured hop latency from the owner's region 100–250 ms (REST probe 126–192 ms; join probe 106–252 ms).
+3. **No loading boundaries.** No `loading.tsx` anywhere, so nothing rendered until the whole server response arrived, and dynamic routes had nothing to prefetch.
+4. **Admin audit on the navigation path.** `recordAdminContextEntry` (lookup + hourly-deduplicated write) ran before rendering on every workspace page for platform admins.
+5. **Not causes:** queries are indexed on `organization_id` and the data set is tiny; cold starts add ~1.1 s on the first request after idle (`/api/health` 1.38 s cold vs 0.24 s warm) and are not addressed by code.
+
+**Baseline (dev log of the owner's session, application-code time):** candidates list 1956 ms, candidate detail 1862 ms, members 1678 ms, dashboard median ~1.6 s (min 704 ms), admin overview avg 1718 ms, admin organizations avg 826 ms, application page avg 1022 ms. Production public endpoints (warm, from Norway): `/api/health` 0.24 s, `/login` 0.27–0.31 s.
+
+**Changes (no caching of tenant data; guards and RLS unchanged):**
+
+- `vercel.json`: `"regions": ["dub1"]` so functions run next to the database (takes effect on the next deployment).
+- `getOrganizationContext`: organization, platform-admin flag and active membership (joined to the organization by slug with `!inner`) in one round trip after the session check; same authorization rules. Query shape verified read-only against the hosted project.
+- Admin context-entry audit moved into `after()` with a client created during render (request APIs are unavailable inside `after()` in Server Components); `recordAuditEvent` accepts an optional client.
+- `loading.tsx` for `/o/[orgSlug]`, `/admin` and `/app` with an accessible `PageSkeleton` (status region, announced once, placeholders hidden).
+- Parallel independent reads on the candidate, application and admin-organization pages.
+
+**Measured (hosted project, read-only probe from this machine, median of 4):**
+
+| Chain                                                                  | Before | After |
+| ---------------------------------------------------------------------- | ------ | ----- |
+| Organization guard (org → admin ∥ membership vs all three in parallel) | 196 ms | 85 ms |
+| Candidate page reads (candidate → apps ∥ jobs vs all in parallel)      | 145 ms | 87 ms |
+| Single hop, reference                                                  | 66 ms  | —     |
+
+Sequential hops per navigation: workspace pages 4 → 3 (admins: 5–6 → 3), candidate detail 6–7 → 4–5, application page 5 → 4, admin organization 4 → 3. The region change is expected to cut each remaining hop from ~100 ms to a few milliseconds on Vercel; it can only be measured after redeploying (check that `X-Vercel-Id` ends in `dub1::…`).
+
+**Commands and results (this machine):**
+
+| Command                                      | Result                                                                                                                                                                                            |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm typecheck`                             | pass                                                                                                                                                                                              |
+| `pnpm lint`                                  | 0 errors (7 pre-existing warnings)                                                                                                                                                                |
+| `pnpm test`                                  | 40 files, **375/375** (new `page-skeleton.test.tsx`; auth-guard tests unchanged and green)                                                                                                        |
+| `pnpm db:verify`                             | 9 files, **90/90** (no schema change)                                                                                                                                                             |
+| `pnpm build`                                 | pass                                                                                                                                                                                              |
+| `pnpm test:e2e` against the standalone build | 44 passed, 1 failed, 55 skipped; the failure is the documented intermittent "persists a menu move" preview test (menu timing under full-suite load); re-run in isolation: **21 passed, 0 failed** |
+| Local standalone, warm public pages          | `/login` TTFB 7–11 ms, preview pipeline 18–26 ms                                                                                                                                                  |
+
+**Not verified / limitations:** authenticated navigation timing on Vercel before/after needs the owner's session and a redeploy (the region pin is a deployment setting); cold starts remain; the `/app` router still costs one extra server round trip after login; LinkedIn/GitHub/AI features untouched. Committed locally only (a push would auto-deploy through the Vercel Git integration).
