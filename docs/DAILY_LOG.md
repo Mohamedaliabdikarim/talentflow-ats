@@ -893,3 +893,30 @@ exit=0
 **Honest note on the demo application stage:** it reads `new`, with `stage_changed_at` 2026-10-20T09:51:26Z — a stage move during the owner's own app use on 2026-10-20, before this 2026-10-21 push. The migration only alters `candidates` and cannot write to `applications`, so it did not change the stage; the application record is intact and its organization matches its job and candidate.
 
 **Not done (still needing separate approval):** `supabase/storage/candidate-cvs.sql` (private bucket + policies), file uploads, deployment, AI integration. No existing records were modified by this operation.
+
+## 2026-10-21 (continued) — Candidate CV Storage bucket and policies applied (approved) and verified
+
+**Request:** apply ONLY `supabase/storage/candidate-cvs.sql` (private bucket + four tenant-scoped policies); no uploads, no record changes, no deploy, no AI, no rollback statements.
+
+**Pre-flight:** project ref `zcxmyaxpftzwpzvmhslm` confirmed; the SQL file is byte-identical to `HEAD` (sha256 `472ffd61…`, committed, clean); migration 0005 applied (5 migrations, 10 CV columns); `can_access_org` present; no `candidate-cvs` bucket and no `storage.objects` policies existed (no conflicts); the only destructive statements in the file are idempotent `drop policy if exists` (part of setup); the rollback statements are comments and do not run.
+
+**Execution:** a new purpose-built, hard-coded command `pnpm supabase:hosted storage-setup` (in `scripts/db/hosted.mjs`) ran the reviewed file over the same session-mode pooler connection the migration pushes use (over TLS; the connection string is never printed). The whole file ran as one atomic statement batch.
+
+```text
+[hosted] project zcxmyaxpftzwpzvmhslm: applying supabase/storage/candidate-cvs.sql via <pooler-url>
+Finished storage setup.
+exit=0
+```
+
+**Read-only verification (MCP `execute_sql`):**
+
+| Check                  | Result                                                                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bucket                 | `candidate-cvs` exists, `public = false`, `file_size_limit = 10485760` (10 MB), `allowed_mime_types = {application/pdf}`                    |
+| Policies               | exactly four `candidate_cvs_*` (SELECT/INSERT/UPDATE/DELETE), role `authenticated`, each scoped to the bucket and checking `can_access_org` |
+| Other storage policies | none                                                                                                                                        |
+| Bucket count           | 1 (only `candidate-cvs`)                                                                                                                    |
+| Migration history      | 5 (unchanged)                                                                                                                               |
+| Data                   | candidates 1, jobs 1, applications 1, organizations 1, memberships 1, auth users 2 — unchanged                                              |
+
+**Status:** the candidate CV feature is now fully provisioned on the hosted project (schema + private Storage + policies). Uploads will work in a deployed/authenticated environment. **Not done (await approval):** file uploads/tests against hosted Storage, deployment, AI integration.

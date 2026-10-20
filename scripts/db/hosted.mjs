@@ -9,9 +9,15 @@
  *   SUPABASE_DB_PASSWORD   database password, used by `link` and `push`
  */
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import pg from "pg";
 
 const ref = process.env.SUPABASE_PROJECT_REF;
 const [command] = process.argv.slice(2);
+
+// The only Storage setup this wrapper will run, hard-coded so it cannot become a generic SQL
+// runner. Applies the reviewed private bucket + tenant-scoped policies (approval-gated).
+const STORAGE_SETUP_FILE = "supabase/storage/candidate-cvs.sql";
 
 /**
  * IPv4-only networks cannot reach the direct database host (IPv6). The CLI normally stores
@@ -42,8 +48,9 @@ function fail(message) {
   process.exit(2);
 }
 
-if (!command || !(command in commands)) {
-  fail(`Usage: pnpm supabase:hosted <${Object.keys(commands).join("|")}>`);
+const isStorageSetup = command === "storage-setup";
+if (!command || (!(command in commands) && !isStorageSetup)) {
+  fail(`Usage: pnpm supabase:hosted <${Object.keys(commands).join("|")}|storage-setup>`);
 }
 if (!ref) fail("SUPABASE_PROJECT_REF is not set in .env.local");
 if (!process.env.SUPABASE_ACCESS_TOKEN) {
@@ -52,6 +59,33 @@ if (!process.env.SUPABASE_ACCESS_TOKEN) {
 const expectedHost = `${ref}.supabase.co`;
 if (!(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").includes(expectedHost)) {
   fail(`NEXT_PUBLIC_SUPABASE_URL does not point at ${expectedHost}; refusing to continue`);
+}
+
+if (isStorageSetup) {
+  if (!poolerHost) {
+    fail("storage-setup needs SUPABASE_POOLER_HOST (session-mode pooler) in .env.local");
+  }
+  const sql = readFileSync(STORAGE_SETUP_FILE, "utf8");
+  const connectionString = `postgresql://postgres.${ref}:${encodeURIComponent(
+    process.env.SUPABASE_DB_PASSWORD ?? "",
+  )}@${poolerHost}:5432/postgres`;
+  console.log(`[hosted] project ${ref}: applying ${STORAGE_SETUP_FILE} via <pooler-url>`);
+  // The pooler terminates TLS with a certificate not in the default CA bundle; the password
+  // still travels over TLS. The whole file runs as one statement batch (atomic).
+  const client = new pg.Client({ connectionString, ssl: { rejectUnauthorized: false } });
+  try {
+    await client.connect();
+    await client.query(sql);
+    console.log("Finished storage setup.");
+  } catch (error) {
+    console.error(
+      `storage setup failed: ${String(error.message ?? error).replace(/postgresql:\/\/[^\s]+/g, "<redacted>")}`,
+    );
+    process.exit(1);
+  } finally {
+    await client.end().catch(() => {});
+  }
+  process.exit(0);
 }
 
 // Print the command without the connection URL (it embeds the password).
