@@ -76,6 +76,7 @@ Legend: ✔ allowed through RLS, ✖ denied, S = server-side only through `servi
 - Local verification: `pnpm db:verify` starts an embedded PostgreSQL 17 instance, applies `scripts/db/local-auth-shim.sql` (emulates `auth.users`, `auth.uid()` and the Supabase roles) and then all migrations, and runs the RLS test suite in `tests/db`.
 - Hosted: `pnpm supabase:hosted link|list-remote|dry-run|push` (credentials from `.env.local`; `push` only with owner approval). Migrations 0001–0003 were applied to the hosted project on 2026-10-19.
 - Parity check: `pnpm db:fingerprint` prints a hash of the local schema; the same query (`scripts/db/schema-fingerprint.sql`) run read-only on the hosted project must return the same hash (ADR-026).
+- Hosted-like verification: `TALENTFLOW_DB_HOSTED_LIKE=1 pnpm db:verify` emulates the default privileges measured on the hosted project (API roles receive `TRUNCATE, REFERENCES, TRIGGER, MAINTAIN` on every new table) and applies `supabase/proposed/*.sql` after the migrations, so the whole suite runs on the state a proposal would leave on the hosted project.
 - Proposals: a migration that is written but not yet approved waits in `supabase/proposed/` with its own DB test; it moves to `supabase/migrations/` unchanged once approved. Pending: `20261019140000_privilege_hardening.sql` (`docs/SECURITY.md` §8).
 - Rollback strategy: forward-only migrations; a compensating migration is written for any change applied to the hosted project after customer data exists.
 

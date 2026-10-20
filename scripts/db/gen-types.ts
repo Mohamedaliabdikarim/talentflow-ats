@@ -114,8 +114,9 @@ async function main(): Promise<void> {
   try {
     await cluster.createDatabase(DATABASE_NAME);
     const url = cluster.urlFor(DATABASE_NAME);
-    const files = await applyLocalSchema(url);
-    console.info(`[db:types] applied ${files.length} migration(s)`);
+    // Always the committed migrations only: types never describe an unapproved proposal.
+    const applied = await applyLocalSchema(url, { hostedLike: false });
+    console.info(`[db:types] applied ${applied.migrations.length} migration(s)`);
 
     const client = new pg.Client({ connectionString: url });
     await client.connect();

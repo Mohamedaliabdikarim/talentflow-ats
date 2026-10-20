@@ -448,3 +448,47 @@ Nothing unexpected occurred; the stop rule was not triggered.
 | `pnpm db:fingerprint`          | `227fed80180eced8183d19d5634a8ee0`, RLS-enabled tables 9  |
 
 **Not done (separate approvals):** `pnpm bootstrap:admin` (first hosted user; note that the `auth.users` → `profiles` trigger has not yet fired on the hosted project, so the bootstrap is also its first real exercise), hosted Authentication settings (sign-ups off, OTP expiry, redirect URLs, password length), migration 0004, deployment, AI integration.
+
+## 2026-10-20 — Review of proposed privilege-hardening migration 0004 (nothing applied)
+
+**Request:** before the first admin is created, review `supabase/proposed/20261019140000_privilege_hardening.sql`: explain each removed privilege, verify app functionality, RLS helpers, triggers and admin/customer workflows are preserved, run the relevant local tests, confirm safe applicability to the empty hosted database, report risks; do not apply, create users, change hosted auth settings or deploy. Review document for the owner: `docs/PRIVILEGE_HARDENING_REVIEW.md`.
+
+**Hosted preconditions measured read-only (MCP `execute_sql`, role `supabase_read_only_user`):** roles `anon`, `authenticated`, `service_role`, `supabase_auth_admin`, `postgres`, `supabase_admin` exist; all nine tables and all our functions are owned by `postgres`; `rls_auto_enable()` is owned by `postgres`, `SECURITY DEFINER`, ACL null, and is the function of event trigger `ensure_rls` (`ddl_command_end`); `pg_default_acl` for role `postgres` in `public`: tables `{postgres=arwdDxtm,anon=Dxtm,authenticated=Dxtm,service_role=Dxtm}`, functions `{postgres=X}`, sequences `{postgres=rwU}`; `jobs` ACL `{postgres=arwdDxtm,authenticated=arwdDxtm,service_role=arwdDxtm}`; 3 migrations; 0 live rows; `auth.users` 0, `profiles` 0, `platform_admins` 0. `pnpm supabase:hosted dry-run` (read-only): `"upToDate":true … "Remote database is up to date."` — the proposal directory is invisible to the CLI.
+
+**Correction to yesterday's finding:** the hosted tables also carry `MAINTAIN` (PostgreSQL 17, the `m` in `arwdDxtm`), which yesterday's eight-privilege query did not test; and Supabase's per-schema default for new tables is `TRUNCATE, REFERENCES, TRIGGER, MAINTAIN` only (not `ALL`), for all three API roles. The proposal and the test were updated accordingly: statement 1 now revokes `maintain` too, statement 2 removes the per-schema default for `anon`, `authenticated` and `service_role` (new tables then start with no API-role privileges, as locally), and the test emulates the measured default instead of `ALL`.
+
+**PostgreSQL 17 semantics checked with a one-off experiment** (embedded 17.10, script outside the repository), verbatim output:
+
+```json
+{
+  "server": "17.10",
+  "writer_has_execute_on_trigger_fn": false,
+  "row_trigger_fired_without_execute": true,
+  "direct_call_without_execute": "permission denied for function trg",
+  "direct_call_with_execute": "trigger functions can only be called as triggers",
+  "event_trigger_fired_without_execute": true,
+  "event_trigger_delta": 1,
+  "writer_maintain_before": true,
+  "writer_maintain_after": false,
+  "default_grant_applied": true,
+  "default_revoke_reversed_it": true,
+  "default_acl_entries_after": []
+}
+```
+
+Conclusions: row triggers and event triggers fire without an EXECUTE check on the invoking role, so the EXECUTE revokes cannot break the `auth.users` → `profiles` trigger or Supabase's `ensure_rls`; a trigger function cannot be run over RPC before or after (only the error text changes); `MAINTAIN` revokes work; a per-schema `ALTER DEFAULT PRIVILEGES … REVOKE` reverses a per-schema GRANT (the measured case). (A first version of the experiment counted all event-trigger rows and reported `false`, because GRANT/REVOKE also fire `ddl_command_end`; measuring the delta around the DDL fixed the measurement, not the semantics.)
+
+**Tooling added:** hosted-like mode for the database suite, `TALENTFLOW_DB_HOSTED_LIKE=1 pnpm db:verify` (`scripts/db/local-schema.ts`): emulates the measured hosted default privileges before the migrations and applies `supabase/proposed/*.sql` after them, so the entire suite runs on the state the proposal would leave on the hosted project. `pnpm db:types` always uses the committed migrations only. The hardening test (now 10 cases) covers: reproduced hosted grants and default, DML-only result for `authenticated`, nothing for `anon`, `service_role` unchanged, helpers and RPCs executable by `authenticated` and denied to `anon`, `SECURITY INVOKER` trigger functions untouched, profile-sync trigger limited to `supabase_auth_admin` and still firing, future tables with no API-role privileges, idempotent re-application.
+
+**Tests run and exact results:**
+
+| Command                                      | Result                                                                                       |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `pnpm db:verify`                             | 41 passed / 41 (4 files)                                                                     |
+| `TALENTFLOW_DB_HOSTED_LIKE=1 pnpm db:verify` | 41 passed / 41; "hosted-like mode (default privileges emulated; 1 proposed migration(s): …)" |
+| `pnpm test`                                  | 99 passed / 99                                                                               |
+| `pnpm lint` / `pnpm typecheck`               | Pass (one type error from the loader's new return type fixed in `scripts/db/gen-types.ts`)   |
+| `pnpm db:types`                              | no diff                                                                                      |
+| `pnpm supabase:hosted dry-run`               | exit 0, up to date, nothing pending                                                          |
+
+**Verified vs pending:** the proposal is verified locally and judged safe for the empty hosted database (`docs/PRIVILEGE_HARDENING_REVIEW.md` §6–§7). Not done, awaiting separate approvals: applying 0004, `pnpm bootstrap:admin`, hosted Authentication settings, deployment, AI integration.
