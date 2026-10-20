@@ -692,3 +692,27 @@ Routes on the stable server: `/login` 200, `/` 200, `/auth/confirm` (no token) �
 **Effect for the existing admin:** the account has no `app_metadata.password_set`, so on the next protected navigation the local app routes it to `/auth/set-password`, where the owner sets a password they choose; that submission (the owner's own action) sets the flag. I did not set a password, revoke the session, create a recovery link or change any hosted Auth setting.
 
 **Safest next step:** on `http://localhost:3000` open any protected page; you will be sent to set a password. Choose one of at least 10 characters. After that you have full access and future sign-ins use that password. Not done: hosted Auth settings, deployment, AI integration.
+
+## 2026-10-20 (continued) — Phase 1 security verification + Phase 2 onboarding readiness review (read-only; no code change)
+
+**Phase 1 (read-only hosted checks, project zcxmyaxpftzwpzvmhslm):** exactly 1 platform admin and 1 auth user; `app_metadata.password_set = "true"` for that admin with only the expected keys (`password_set`, `provider`, `providers`); `granted_by` null (bootstrap). Audit trail in order: `admin.bootstrapped` (07:00), `auth.password_established` (08:08, correct user), `auth.signed_out`, `auth.signed_in` (08:14). Organizations, memberships, jobs, candidates and applications all 0. Project ref confirmed by the project-scoped MCP connection and the earlier env/linked-ref/URL match (a speculative `current_setting` probe returned null because no such GUC exists; not relied upon). No passwords, hashes, tokens or cookies were read or shown.
+
+**Guard review:** every protected route and Server Action funnels through `requireUser` (directly or via `requirePlatformAdmin`/`requireOrgAccess`), which since ADR-030 routes any session without `app_metadata.password_set === true` to `/auth/set-password`. Reads are additionally RLS-scoped; mutations gate directly in each action. No bypass found.
+
+**Phase 2 onboarding review (code + tests, no hosted writes):** the full workflow is implemented and coherent — create organization (`createOrganizationAction`, service role, audited, redirect to detail), invite first org admin with an owner/member role selection and a one-time link shown once (`inviteUserAction` + `InviteUserForm`), accept via `/auth/confirm` → `/auth/set-password` (sets the password flag, activates memberships), sign in → `/o/{slug}`, and platform-admin act-on-behalf with a per-hour de-duplicated `admin.context_entered` audit. Tenant isolation and RLS are covered by `tests/db/rls.test.ts` (read/write isolation, cross-tenant link rejection, admin-reads-all, audit actor integrity) and `tests/db/membership-activation.test.ts`.
+
+**Incompleteness / risks identified:**
+
+- No resend path for a pending or expired invitation: `inviteUserAction` inserts the membership after generating the link, so re-inviting someone who is already a member fails on the unique constraint and the fresh link is not surfaced. The 1-hour link lifetime makes this reachable. Not blocking a live handoff (create and share immediately); proposed as a follow-up fix (surface a new link for an already-pending member without downgrading an active one).
+- No automated end-to-end test of the real invite → confirm → set-password → sign-in flow, because it requires the hosted GoTrue Auth server (`generateLink`/`verifyOtp`/`updateUser`); the pieces are unit- and DB-tested, and the admin path was manually verified by the owner. Tracked as T24 (hosted).
+
+**Verification run (this review changed no code):**
+
+| Command                                                | Result                                  |
+| ------------------------------------------------------ | --------------------------------------- |
+| `pnpm check` (lint, typecheck, test, db:verify, build) | Pass — unit 118/118, db 48/48, build ok |
+| `pnpm test:e2e`                                        | 45 passed, 55 skipped                   |
+
+Skipped E2E are deliberate `test.skip`s: the screenshot-capture spec is opt-in (`SCREENSHOTS=1`) and desktop-only, and the mutating preview board test runs on a single project to avoid a shared-store race. No functional coverage was skipped.
+
+**Not done (boundaries honoured):** no hosted writes, no invitations sent, no hosted Auth change, no deployment, no AI, no new admin or password reset, the established admin account untouched. Awaiting approval to create the first customer organization.
