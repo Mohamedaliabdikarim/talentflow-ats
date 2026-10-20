@@ -860,3 +860,36 @@ The full build type-checks test files, which caught a `File`/`Uint8Array` typing
 **Storage SQL review and fix:** `supabase/storage/candidate-cvs.sql` configures a private bucket (`public = false`, 10 MB, `application/pdf`) and four restrictive `storage.objects` policies scoped to the bucket and the tenant via `can_access_org` on the first path segment. The bucket upsert was already idempotent; the `create policy` statements were not, so a re-run would have failed. Fixed by preceding each with `drop policy if exists`. Verified locally against an emulated storage schema: the script parses, creates the private bucket, creates the four policies, and re-runs cleanly (still exactly four policies).
 
 **Blockers/warnings:** none. The only manual hosted steps, both needing explicit approval, are the migration push and applying the Storage SQL. No hosted write was performed.
+
+## 2026-10-21 (continued) — Migration 0005 applied to the hosted project (approved) and verified
+
+**Request:** apply ONLY migration `20261021120000_candidate_cv.sql` via `pnpm supabase:hosted push`; do not run the Storage SQL, create buckets/policies, upload files, deploy, or start AI; verify read-only afterward.
+
+**Pre-flight:** project ref `zcxmyaxpftzwpzvmhslm` confirmed (env, linked ref, URL host all agree); the file is byte-identical to `HEAD` (sha256 `5560e74a…`); fresh dry-run listed exactly `20261021120000_candidate_cv.sql`.
+
+**Push (once), verbatim (connection string masked):**
+
+```text
+> node --env-file=.env.local scripts/db/hosted.mjs "push"
+[hosted] project zcxmyaxpftzwpzvmhslm: supabase db push --db-url <pooler-url>
+Connecting to remote database...
+Applying migration 20261021120000_candidate_cv.sql...
+{"upToDate":false,"dryRun":false,"migrations":["20261021120000_candidate_cv.sql"],"seeds":[],"roles":[],"message":"Finished supabase db push."}
+exit=0
+```
+
+**Read-only verification (MCP `execute_sql`, CLI `migration list`):**
+
+| Check                      | Result                                                                                                                                                                                                                         |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Migration history          | 5 versions; local = remote for all; new `20261021120000` present                                                                                                                                                               |
+| CV columns                 | all 10 added to `candidates` (`cv_object_key`, `cv_filename`, `cv_size_bytes`, `cv_uploaded_at`, `cv_uploaded_by`, `cv_source`, `cv_ai_authorized`, `cv_ai_authorized_at`, `cv_ai_authorized_by`, `cv_ai_authorization_basis`) |
+| CV constraints             | all 8 present (`…_object_key_length`, `…_filename_length`, `…_size_bytes_range`, `…_source_allowed`, `…_metadata_consistent`, `…_ai_requires_cv`, `…_ai_authorization_consistent`, `…_ai_basis_length`)                        |
+| `cv_ai_authorized` default | `false`                                                                                                                                                                                                                        |
+| Demo candidate             | intact: exists, `cv_object_key` null, `cv_ai_authorized` false                                                                                                                                                                 |
+| Counts                     | candidates 1, jobs 1, applications 1, organizations 1, memberships 1, auth users 2 — unchanged                                                                                                                                 |
+| RLS                        | still enabled on every public table                                                                                                                                                                                            |
+
+**Honest note on the demo application stage:** it reads `new`, with `stage_changed_at` 2026-10-20T09:51:26Z — a stage move during the owner's own app use on 2026-10-20, before this 2026-10-21 push. The migration only alters `candidates` and cannot write to `applications`, so it did not change the stage; the application record is intact and its organization matches its job and candidate.
+
+**Not done (still needing separate approval):** `supabase/storage/candidate-cvs.sql` (private bucket + policies), file uploads, deployment, AI integration. No existing records were modified by this operation.
