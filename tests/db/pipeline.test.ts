@@ -132,6 +132,69 @@ describe("filters stay inside the tenant", () => {
   });
 });
 
+describe("filter result sets narrow correctly (multiple jobs and candidates)", () => {
+  /**
+   * Mirrors listPipelineCards exactly: resolve matching candidate ids within the tenant
+   * (empty match → no rows), then restrict applications by job and candidate. Proves the
+   * displayed set actually changes per filter, not just that a control exists.
+   */
+  async function boardAppIds(filters: { jobId?: string; q?: string }): Promise<string[]> {
+    return asUserCommit(ids.userP, async (client) => {
+      let candidateIds: string[] | null = null;
+      if (filters.q) {
+        const { rows } = await client.query(
+          `select id from public.candidates where organization_id = $1 and full_name ilike $2`,
+          [ids.orgP, `%${filters.q}%`],
+        );
+        candidateIds = rows.map((row) => row.id as string);
+        if (candidateIds.length === 0) return [];
+      }
+      const clauses = ["organization_id = $1"];
+      const values: unknown[] = [ids.orgP];
+      if (filters.jobId) {
+        values.push(filters.jobId);
+        clauses.push(`job_id = $${values.length}`);
+      }
+      if (candidateIds) {
+        values.push(candidateIds);
+        clauses.push(`candidate_id = any($${values.length})`);
+      }
+      const { rows } = await client.query(
+        `select id from public.applications where ${clauses.join(" and ")}`,
+        values,
+      );
+      return (rows as Array<{ id: string }>).map((row) => row.id).sort();
+    });
+  }
+
+  const sorted = (...ids: string[]) => ids.slice().sort();
+
+  it("no filter shows every application in the tenant", async () => {
+    expect(await boardAppIds({})).toEqual(sorted(ids.appP1Ada, ids.appP2Ada, ids.appP1Bob));
+  });
+
+  it("the job filter narrows to that job's applications", async () => {
+    expect(await boardAppIds({ jobId: ids.jobP1 })).toEqual(sorted(ids.appP1Ada, ids.appP1Bob));
+    expect(await boardAppIds({ jobId: ids.jobP2 })).toEqual(sorted(ids.appP2Ada));
+  });
+
+  it("the name filter narrows to the matching candidate's applications, case-insensitively", async () => {
+    expect(await boardAppIds({ q: "ada" })).toEqual(sorted(ids.appP1Ada, ids.appP2Ada));
+    expect(await boardAppIds({ q: "LOVELACE" })).toEqual(sorted(ids.appP1Ada, ids.appP2Ada));
+    expect(await boardAppIds({ q: "bob" })).toEqual(sorted(ids.appP1Bob));
+  });
+
+  it("combined job and name filters intersect", async () => {
+    expect(await boardAppIds({ jobId: ids.jobP1, q: "ada" })).toEqual(sorted(ids.appP1Ada));
+    // Bob has no application on job P2, so the intersection is empty.
+    expect(await boardAppIds({ jobId: ids.jobP2, q: "bob" })).toEqual([]);
+  });
+
+  it("a name with no match yields an empty board, never the whole tenant", async () => {
+    expect(await boardAppIds({ q: "zzz-nobody" })).toEqual([]);
+  });
+});
+
 describe("stage moves", () => {
   it("persist across requests and update stage_changed_at", async () => {
     const before = await pool.query(

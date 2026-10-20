@@ -751,3 +751,42 @@ Honest note on skips/flake: the 55 skipped E2E are deliberate (`SCREENSHOTS=1` o
 **Remaining risks:** reissue still has no automated end-to-end test through the real Auth server (needs hosted GoTrue); it is covered by unit/DB/jsdom tests and the existing confirm-route safe-failure behaviour. A full browser E2E of the authenticated admin flow remains dependent on hosted auth (T24 family).
 
 **Boundaries honoured:** no hosted organizations, memberships or users created; no real invitations; no hosted Auth change; no deployment; the established admin account untouched; no links, tokens or secrets exposed. No migration applied (none needed).
+
+## 2026-10-20 (continued) — Data-integrity verification + ATS filtering review and tests (no production change)
+
+**Phase 1 (read-only hosted, project zcxmyaxpftzwpzvmhslm, confirmed via the project-scoped MCP and the earlier env/linked-ref/URL match):** one active organization "TalentFlow Demo" (slug `talentflow-demo`); one active **owner** membership held by a customer account distinct from the platform admin; one open job "Fullstack Developer"; one candidate "Alex Morgan"; one application in stage `screening`. A join check confirms the application, its job and its candidate all share the organization id (`all_same_org = true`). No duplicate applications, memberships or organization slugs. The audit trail is contiguous: `organization.created` → `user.invited` → `auth.password_established` → `membership.activated`.
+
+**Verified state vs history (important distinction):** the application's **current** stage is `screening` with `stage_changed_at` 2026-10-20T09:01:35Z. There is **no** stage-transition history table and no per-move audit event, so the New→Screening path itself is not independently recorded; only the current stage and its last-changed timestamp are. (A stage-change audit/history is a candidate follow-up, out of scope here.) Minor note: `membership.activated`/`auth.password_established` audit rows carry a null organization id by design (auth-level events).
+
+**Phase 2 (filtering review, authenticated ATS UI):** reviewed the real code paths, not just the controls.
+
+- Pipeline by job: `listPipelineCards` applies `job_id = <uuid>` server-side.
+- Candidate-name filter: resolves matching candidate ids within the tenant (`ilike`, LIKE-escaped) then restricts applications with `candidate_id in (...)`; an empty match returns `[]` (no leakage to the full set). The candidates page uses the same `ilike` filter via `listCandidates`.
+- Combined: both apply together (intersection); verified to empty correctly when they do not intersect.
+- Empty state and reset: `PipelineView` shows "No applications match these filters" with a Clear-filters link; the filter form has a Clear link that drops the params.
+- Persistence: filters live in the URL (`?job=&q=`, ADR-022), so a filtered board is shareable/bookmarkable and the form reflects the active values.
+- Tenant isolation: every query is `organization_id`-scoped and RLS-backed; a cross-tenant namesake is never returned (DB test).
+- Accessibility/responsive: labelled controls (`Label htmlFor`), Radix `Select` (keyboard), search input, submit button; the filter bar is `flex-wrap`.
+
+All required behaviours are present and correct; **no production fix was needed**.
+
+**Tests added (genuinely exercise filtering with multiple jobs and candidates):**
+
+- `tests/unit/pipeline-filters.test.ts`: `parsePipelineFilters` (the "all" sentinel and malformed ids mean no job filter; empty/whitespace and over-long queries are dropped; repeated params take the first), `escapeLikePattern` (`% _ \` escaped), `groupByStage`, `daysInStage`/`formatStageAge`.
+- `tests/db/pipeline.test.ts`: a new block asserting the result set **narrows to the exact expected applications** across no-filter (3), job-only (2 / 1), name-only (2, case-insensitive incl. "LOVELACE" / 1), combined (1, and empty when they do not intersect), and a no-match name (empty), mirroring `listPipelineCards`' two-step logic over two orgs, three jobs and three candidates (including a cross-tenant namesake).
+
+**Quality gates:**
+
+| Command                        | Result                             |
+| ------------------------------ | ---------------------------------- |
+| `pnpm lint` / `pnpm typecheck` | Pass                               |
+| `pnpm test`                    | 136 passed / 136 (13 files)        |
+| `pnpm db:verify`               | 54 passed / 54 (5 files)           |
+| `pnpm build`                   | Compiled successfully (standalone) |
+| `pnpm test:e2e`                | 45 passed, 55 skipped              |
+
+Skips are deliberate: opt-in screenshot captures (`SCREENSHOTS=1`) and the single-project mutating preview board test. The preview browser suite already exercises the job filter, the combined name filter, persistence across reload, reset, and the empty state against 4 jobs and 10 candidates.
+
+**Remaining risks:** the real PostgREST query path of `listPipelineCards`/`listCandidates` is not integration-tested locally (needs a running Supabase/PostgREST; none in the harness); it is covered by the DB logic tests, the preview browser tests, and the owner's manual hosted end-to-end. No stage-transition history exists yet.
+
+**Boundaries honoured:** hosted checks were read-only; no hosted data created, edited or deleted; no invitations, Auth changes, password resets or deploys; no AI or redesign; automated tests use synthetic data only. The core ATS workflow (auth, provisioning, invite/resend, jobs, candidates, applications, Kanban with job + name filtering, tenant isolation, audit) is implemented, verified and tested — ready for a premium UI/design pass.
