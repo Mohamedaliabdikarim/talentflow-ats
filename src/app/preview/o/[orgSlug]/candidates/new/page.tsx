@@ -16,7 +16,7 @@ export default function PreviewNewCandidatePage() {
         description="Form shown for visual review; controls are disabled in the preview."
       />
       <fieldset disabled className="m-0 rounded-lg border bg-card p-6">
-        <CandidateForm orgSlug={PREVIEW_ORG_SLUG} jobOptions={jobs} />
+        <CandidateForm orgSlug={PREVIEW_ORG_SLUG} jobOptions={jobs} extractAction={null} />
       </fieldset>
     </FadeIn>
   );

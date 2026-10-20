@@ -247,3 +247,27 @@ evidence was unavailable and why.
 - **Candidate-facing transparency.** The authorization basis is recorded by the recruiter, as for
   the CV. Whether candidates must be informed that their public GitHub activity was analysed is a
   policy question outside this code.
+
+## 9. CV upload is optional; a chosen CV prefills the "Add candidate" form (ADR-039)
+
+**Status:** Implemented locally. Two supported creation flows:
+
+1. **With CV.** The recruiter chooses a PDF in the "Add candidate" form. The file is validated like an
+   upload, its text is read in memory and sent once to Azure OpenAI with the strict contract
+   `candidate-profile-extract-v1` (`full_name`, `headline`, `email`, `phone`, `location`,
+   `linkedin_url`, `github_url`, each copied literally or `null`). The validated and sanitised
+   values prefill only the fields the recruiter has not typed into; the form says which fields were
+   prefilled and why any found value was dropped (invalid email, non-profile LinkedIn/GitHub link).
+   The recruiter reviews, corrects and saves; the CV is stored with the candidate as before.
+2. **Without CV.** The recruiter enters the details manually and saves. Nothing requires a CV.
+
+Rules preserved: choosing or uploading a CV never records AI-use authorization for Candidate
+Insights; GitHub evidence needs its separate authorization; LinkedIn is never fetched. No summary,
+skills or judgement is extracted, so no AI prose reaches the notes. The audit event
+`candidate.cv_details_extracted` carries counts only. Failures (no extractable text, model or
+transport error, AI not configured) are shown as a note and the form stays usable.
+
+**Flagged for the owner:** extraction is AI processing of the CV before any authorization is
+recorded (ADR-033's principle). The owner decided it is automatic for data-entry assistance; the
+output is not persisted by the system and no assessment is produced. Whether candidates must be
+informed, and the Azure retention question (§2), remain owner decisions.

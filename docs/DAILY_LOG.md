@@ -1102,3 +1102,37 @@ Owner approval received for migration 0008 only, conditional on a fresh dry-run 
 CV authorization behaviour is untouched: the consent columns, their values and the `candidates` policy are unchanged; the new GitHub authorization is false for every existing candidate.
 
 **Not done (per instruction, stop here):** the live GitHub analysis (T45). Still required before it: GitHub authorization recorded on a candidate with a profile URL, and optionally `GITHUB_TOKEN`. CI for commit 568471f was in progress at the time of writing.
+
+## 2026-10-21 (continued) — CV upload stays optional; a chosen CV prefills "Add candidate" via AI extraction (ADR-039)
+
+**Owner correction:** the PDF CV must always remain optional and candidate creation must never be blocked without one. Two supported flows: with a CV (Azure reads the PDF, prefills the form, the recruiter reviews and saves with the CV) and without a CV (manual entry). All authorization rules preserved.
+
+**Finding before coding:** CV upload at creation was already optional (`createCandidateAction` handles a missing file; the input was labelled optional). What was missing was the automatic extraction and prefill. No schema change was needed; nothing is persisted by the extraction.
+
+**Scope delivered (local only):**
+
+- Design: ADR-039 and `docs/AI_INSIGHTS.md` §9. The ADR records the privacy implication of automatic extraction (AI processing of the CV before any AI-use authorization is recorded, ADR-033) as an owner decision, with mitigations: data-entry assistance only, no insight, model output not persisted by the system, `cv_ai_authorized` stays false, the hint under the file input says the CV is read automatically.
+- `src/lib/ai/candidate-extract-contract.ts`: strict contract `candidate-profile-extract-v1` (seven nullable fields, copied literally or null; no summary/skills/score possible), parser with content-free messages, and `sanitizeExtractedCandidate` applying the form's own rules (whitespace, lengths, email format, LinkedIn/GitHub profile-URL validation with `https://` added to bare hosts; invalid values dropped with a warning, never corrected).
+- `src/lib/ai/candidate-extract-prompt.ts` (delimited, neutralised CV block; copy-exactly/null rules; candidate's own details only; no judgement or protected traits) and `src/lib/ai/candidate-extract.ts` (server-only structured call).
+- `src/server/actions/candidate-extract.ts`: `requireOrgAccess`, upload-grade file validation, explicit "not configured" fallback, sanitised values and warnings, audit `candidate.cv_details_extracted` with counts only, content-free failure messages.
+- `src/components/forms/candidate-form.tsx`: choosing a PDF triggers extraction automatically; only empty fields are prefilled (typed values kept); the form lists the prefilled fields and any dropped values; the chosen file stays attached for the save; notes are never prefilled; the submit button is disabled only while reading; `extractAction={null}` disables extraction in the preview; the GitHub field hint points to the separate authorization.
+- Learned again: a `"use server"` module may export only async functions (the "not configured" message constant moved to the pure contract module after Turbopack emptied the action module).
+
+**Commands and results (this machine):**
+
+| Command                                                   | Result                                                                                                                                                                                                                                 |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm typecheck`                                          | pass                                                                                                                                                                                                                                   |
+| `pnpm lint`                                               | 0 errors (7 pre-existing warnings, none new)                                                                                                                                                                                           |
+| `pnpm test`                                               | 36 files, **352/352** (new: `candidate-extract-contract`, `candidate-extract-prompt`, `candidate-extract-action`, `candidate-form.test.tsx`; extended: `candidate-create-action` with explicit "no file" and "empty file input" cases) |
+| `pnpm db:verify`                                          | 8 files, **83/83** (no schema change)                                                                                                                                                                                                  |
+| `pnpm build`                                              | pass                                                                                                                                                                                                                                   |
+| Client bundle scan (55 files)                             | Azure key 0, service-role key 0, `api.github.com` 0, `unpdf` 0, extraction prompt text 0                                                                                                                                               |
+| `pnpm test:e2e` against the standalone build on port 3100 | **45 passed, 0 failed, 55 skipped** (36.4 s)                                                                                                                                                                                           |
+
+**Not verified / open:**
+
+1. Live extraction on a real text PDF and the scanned-PDF fallback (T48): needs a synthetic CV and the owner's session; the dev server targets the hosted project, which already has every migration (0001–0008).
+2. Whether candidates must be informed that their CV is read by AI at upload is an owner decision (ADR-039); the Azure retention question (`docs/AI_INSIGHTS.md` §2) is unchanged.
+
+Docs: ADR-039, `docs/AI_INSIGHTS.md` §9, `docs/SECURITY.md` §9 addendum, `docs/TEST_PLAN.md` T46–T48, `docs/PRD.md` R05 (and R19 corrected to Implemented for ADR-038), `CLAUDE.md`.

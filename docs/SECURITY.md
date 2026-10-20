@@ -101,6 +101,8 @@ Candidate CVs are PDFs held in a **private** Supabase Storage bucket (`candidate
 
 **Audit:** `candidate.cv_uploaded`, `candidate.cv_replaced`, `candidate.cv_deleted`, `candidate.cv_ai_authorized`, `candidate.cv_ai_revoked`, each with organization and candidate ids only — never a filename, URL or document content.
 
+**CV detail extraction at creation (ADR-039, owner decision):** the CV stays optional. When a recruiter chooses a PDF in the "Add candidate" form, the file is validated like an upload, its text is read in memory and sent once to Azure OpenAI with the strict contract `candidate-profile-extract-v1` (seven nullable contact/profile fields, copied literally or null; no summary, skills or judgement). The validated, sanitised values (lengths, email format, LinkedIn/GitHub profile-URL rules; invalid values dropped with a warning) prefill only the fields the recruiter has not typed into; the recruiter reviews and saves. Nothing from the model is stored unless the recruiter submits it; `cv_ai_authorized` stays false; no insight is produced; the audit event `candidate.cv_details_extracted` carries counts only. This is AI processing of the CV before any AI-use authorization is recorded for that candidate: the owner decided it is automatic for data-entry assistance; the hint under the file input says so, and whether candidates must be informed is an owner decision. The preview never calls the extraction.
+
 **Hosted setup (manual, requires the owner's approval, not done in this phase):**
 
 1. Apply migration `supabase/migrations/20261021120000_candidate_cv.sql` through the approved `pnpm supabase:hosted push` path.

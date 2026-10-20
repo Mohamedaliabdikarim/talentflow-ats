@@ -204,3 +204,24 @@ describe("createCandidateAction — PDF and data preservation", () => {
     }
   });
 });
+
+describe("createCandidateAction — the CV is optional (ADR-039)", () => {
+  it("creates the candidate with no file at all: no upload, no CV metadata, no CV audit", async () => {
+    await expect(
+      createCandidateAction("acme", idle, form({ fullName: "No CV Person", jobId: "none" })),
+    ).rejects.toThrow(/REDIRECT:\/o\/.*\/candidates\/cand1/);
+    expect(calls.candidateInserts).toHaveLength(1);
+    expect(calls.uploads).toHaveLength(0);
+    expect(calls.candidateUpdates).toHaveLength(0);
+    expect(calls.deletes).toBe(0);
+    expect(recordAuditEvent).not.toHaveBeenCalledWith("candidate.cv_uploaded", expect.anything());
+  });
+
+  it("treats an empty file input exactly like no file", async () => {
+    const fd = form({ fullName: "Empty File Person", jobId: "none" });
+    fd.set("cv", new File([], "", { type: "application/octet-stream" }));
+    await expect(createCandidateAction("acme", idle, fd)).rejects.toThrow(/REDIRECT/);
+    expect(calls.candidateInserts).toHaveLength(1);
+    expect(calls.uploads).toHaveLength(0);
+  });
+});
