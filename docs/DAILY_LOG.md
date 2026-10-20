@@ -492,3 +492,45 @@ Conclusions: row triggers and event triggers fire without an EXECUTE check on th
 | `pnpm supabase:hosted dry-run`               | exit 0, up to date, nothing pending                                                          |
 
 **Verified vs pending:** the proposal is verified locally and judged safe for the empty hosted database (`docs/PRIVILEGE_HARDENING_REVIEW.md` §6–§7). Not done, awaiting separate approvals: applying 0004, `pnpm bootstrap:admin`, hosted Authentication settings, deployment, AI integration.
+
+## 2026-10-20 (continued) — Migration 0004 applied to the hosted project (approved) and verified
+
+**Request:** the owner approved migration 0004 as reviewed in `docs/PRIVILEGE_HARDENING_REVIEW.md`: move it into `supabase/migrations/`, apply only that migration to the verified project after confirming the ref, the file identity and a dry-run showing only 0004; then verify history, privileges, RLS, functions, triggers and the security checks read-only; document and commit. Not approved (not done): users, hosted auth settings, deployment, AI integration.
+
+**Pre-flight (all verified before the push):**
+
+- `pnpm env:check`: all names present (values never printed). `SUPABASE_PROJECT_REF` = `zcxmyaxpftzwpzvmhslm`; `NEXT_PUBLIC_SUPABASE_URL` matches the ref; `supabase/.temp/project-ref` = `zcxmyaxpftzwpzvmhslm`.
+- File identity: sha256 `3cb873b4273d3b4c7cc8dfbafa43f3b4502570e0b09a31f1b465d86e31f5ba9c` for the reviewed file at `HEAD` (`03c59ed`), in the working tree, and after `git mv` into `supabase/migrations/` (moved unchanged; `supabase/proposed/` now empty).
+- Local with four migrations: `pnpm db:verify` 41/41; `TALENTFLOW_DB_HOSTED_LIKE=1 pnpm db:verify` 41/41 ("0 proposed migration(s)"); `pnpm db:types` no diff; `pnpm db:fingerprint` `227fed80180eced8183d19d5634a8ee0` (grants are not hashed); lint and typecheck pass. The hardening test now applies 0004 from `supabase/migrations/` after reproducing the hosted starting state with 0001–0003.
+- `pnpm supabase:hosted list-remote`: three remote versions, `20261019140000` local only. `pnpm supabase:hosted dry-run`: `Would push these migrations: • 20261019140000_privilege_hardening.sql`; `"migrations":["20261019140000_privilege_hardening.sql"],"seeds":[],"roles":[]`.
+
+**Push (run once), verbatim (connection string masked by the wrapper):**
+
+```text
+> node --env-file=.env.local scripts/db/hosted.mjs "push"
+[hosted] project zcxmyaxpftzwpzvmhslm: supabase db push --db-url <pooler-url>
+Connecting to remote database...
+Applying migration 20261019140000_privilege_hardening.sql...
+{"upToDate":false,"dryRun":false,"migrations":["20261019140000_privilege_hardening.sql"],"seeds":[],"roles":[],"message":"Finished supabase db push."}
+exit=0
+```
+
+Nothing unexpected occurred.
+
+**Read-only verification after the push (CLI `migration list`; MCP `list_migrations`, `list_tables`, `execute_sql`, `get_advisors` as `supabase_read_only_user`):**
+
+| Check                                                                   | Result                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Migration history                                                       | local = remote for `20261019120000`, `20261019120100`, `20261019130000`, `20261019140000`; MCP lists the four (`initial_schema`, `rls_policies`, `membership_activation`, `privilege_hardening`)                                                                                                                                                                                                                                              |
+| Tables / RLS                                                            | 9 tables, all `rls_enabled: true`, 0 rows; 16 policies; 9 RLS-enabled tables                                                                                                                                                                                                                                                                                                                                                                  |
+| Table privileges (8 tested)                                             | `anon`: none. `authenticated`: `DELETE,INSERT,SELECT,UPDATE` on the six tenant tables, `SELECT` on `platform_admins` and `audit_events`, `SELECT,UPDATE` on `profiles`; no `TRUNCATE`, `REFERENCES`, `TRIGGER`, `MAINTAIN` anywhere. `service_role`: all eight (unchanged)                                                                                                                                                                    |
+| Function EXECUTE                                                        | helpers and RPCs (`is_platform_admin`, `is_org_member`, `can_access_org`, `shares_organization_with`, `log_audit_event`, `activate_my_memberships`): anon false, authenticated true, service_role true (unchanged). `sync_profile_from_auth_user`: anon/authenticated/service_role false, `supabase_auth_admin` true. `rls_auto_enable`: all four false. `set_updated_at`, `prevent_organization_change`, `touch_stage_changed_at`: unchanged |
+| Default privileges (`pg_default_acl`, role `postgres`, schema `public`) | tables `{postgres=arwdDxtm/postgres}` (API roles removed); functions `{postgres=X/postgres}`; sequences `{postgres=rwU/postgres}`; the `supabase_admin` entries are untouched (not ours)                                                                                                                                                                                                                                                      |
+| Triggers                                                                | 13 non-internal triggers in `public`; `on_auth_user_created`, `on_auth_user_email_updated` on `auth.users`; event trigger `ensure_rls` → `rls_auto_enable`, enabled                                                                                                                                                                                                                                                                           |
+| Schema fingerprint                                                      | `227fed80180eced8183d19d5634a8ee0` (215 objects, 82 columns, 16 policies, 10 functions, 13 triggers, 2 auth triggers, 9 RLS tables): identical to local and to the pre-0004 value, as expected (grants are not part of the hash)                                                                                                                                                                                                              |
+| Security advisor                                                        | 0 ERROR. Only `authenticated_security_definer_function_executable` remains, for the six intended helpers/RPCs. The `anon_security_definer_function_executable` lint and the `sync_profile_from_auth_user` / `rls_auto_enable` findings are gone                                                                                                                                                                                               |
+| Performance advisor                                                     | INFO only, unchanged: 14 unindexed foreign keys, 9 unused indexes (empty database)                                                                                                                                                                                                                                                                                                                                                            |
+
+**Docs updated:** `docs/PRIVILEGE_HARDENING_REVIEW.md` (status: applied; §9 record), `docs/TEST_PLAN.md` (T30 verified on hosted; execution record), `docs/SECURITY.md` §8, `docs/SUPABASE_INTEGRATION.md`, `docs/DATABASE.md`, `docs/HOSTED_MIGRATION_DRY_RUN.md` §9, `docs/DECISIONS.md` ADR-026, `CLAUDE.md`.
+
+**Verified vs pending:** migration 0004 applied and verified on the hosted project. Not done, awaiting separate approvals: `pnpm bootstrap:admin` (first hosted user; first real run of the `auth.users` → `profiles` trigger), hosted Authentication settings, deployment, AI integration.

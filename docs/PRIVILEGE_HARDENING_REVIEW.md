@@ -1,6 +1,6 @@
 # Proposed migration 0004 — privilege hardening: review for approval
 
-**Date:** 2026-10-20. **File:** `supabase/proposed/20261019140000_privilege_hardening.sql` (not in `supabase/migrations/`, so no push can apply it). **Status:** reviewed and verified locally; **not applied**; awaiting the owner's decision (§8).
+**Date:** 2026-10-20. **File:** `supabase/migrations/20261019140000_privilege_hardening.sql` (reviewed while it lived in `supabase/proposed/`; moved unchanged, sha256 `3cb873b4…`). **Status:** approved by the owner and **applied to the hosted project on 2026-10-20**, verified read-only afterwards (§9).
 
 **Verdict in one paragraph.** The migration only removes privileges; it grants nothing new except EXECUTE on one trigger function to the Auth service role. Every statement acts on objects owned by `postgres`, the role the CLI uses, on an empty database with zero users. The complete database suite passes with the migration applied on a copy of the hosted privilege state, and a dedicated test reproduces the hosted findings before and after. It can be applied safely. Two things changed in the file since it was first committed, after measuring the hosted project more precisely: it now also revokes `MAINTAIN` (a PostgreSQL 17 privilege the hosted tables carry), and it removes Supabase's default table privileges for `service_role` as well as `anon` and `authenticated`, so future tables start with no API-role privileges, exactly as they do locally.
 
@@ -82,10 +82,23 @@ Yes.
 - **`MAINTAIN` requires PostgreSQL 17.** If the project were ever restored onto PostgreSQL 16, statement 1 would fail; the hosted project runs 17.11.
 - **Unchanged by this migration:** the `auth.users` → `profiles` trigger has still never fired on the hosted project; the first `pnpm bootstrap:admin` (separate approval) is its first real run and will be checked by reading `profiles`.
 
-## 8. Decision requested
+## 8. Decision
 
-- [ ] Approve migration 0004 as reviewed (statements 1–4). I will then follow the apply path in §6, one step at a time, with a stop after the dry-run.
-- [ ] Approve without statement 4 (leave `rls_auto_enable()` to Supabase).
-- [ ] Request changes.
+Approved by the owner on 2026-10-20 as reviewed (statements 1–4). Applied the same day; record in §9.
 
-Until one of these is given: nothing is applied, no users are created, no hosted authentication setting changes, nothing is deployed.
+## 9. Applied and verified (2026-10-20)
+
+| Step                | Result                                                                                                                                                                                                                                                                                                      |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pre-flight          | ref `zcxmyaxpftzwpzvmhslm` confirmed (env, URL guard, linked ref); file sha256 `3cb873b4…` identical at `HEAD`, in the working tree and after the move; `pnpm db:verify` 41/41 in both modes with four migrations; `pnpm db:types` no diff; dry-run listed exactly `20261019140000_privilege_hardening.sql` |
+| Push (once)         | `supabase db push --db-url <pooler-url>`: `Applying migration 20261019140000_privilege_hardening.sql…`, `"migrations":["20261019140000_privilege_hardening.sql"]`, `Finished supabase db push.`, exit 0                                                                                                     |
+| History             | local = remote for all four versions (CLI and MCP)                                                                                                                                                                                                                                                          |
+| Table privileges    | `anon` none; `authenticated` DML only (narrower on `platform_admins`, `audit_events`, `profiles`); `service_role` unchanged; RLS enabled on all 9 tables                                                                                                                                                    |
+| Function EXECUTE    | helpers/RPCs unchanged; `sync_profile_from_auth_user`: only `postgres` and `supabase_auth_admin`; `rls_auto_enable`: no API role                                                                                                                                                                            |
+| Default privileges  | `pg_default_acl` for `postgres` in `public`: tables `{postgres=arwdDxtm/postgres}` — the API roles are gone                                                                                                                                                                                                 |
+| Triggers            | 13 in `public`, 2 on `auth.users`, event trigger `ensure_rls` enabled                                                                                                                                                                                                                                       |
+| Schema fingerprint  | `227fed80180eced8183d19d5634a8ee0`, identical to local                                                                                                                                                                                                                                                      |
+| Security advisor    | 0 ERROR; only the six intended helper/RPC WARNs remain; the `anon` lint and the two trigger-function findings are gone                                                                                                                                                                                      |
+| Performance advisor | INFO only, unchanged                                                                                                                                                                                                                                                                                        |
+
+Verbatim outputs: `docs/DAILY_LOG.md` (2026-10-20, continued).

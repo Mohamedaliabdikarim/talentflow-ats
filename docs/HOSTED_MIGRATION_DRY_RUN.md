@@ -112,3 +112,7 @@ The push itself will be requested separately with the dry-run output attached.
 | Privileges         | MCP `execute_sql` (`has_table_privilege`, `has_function_privilege`)                                  | `anon` none; `authenticated` carries Supabase-default `TRUNCATE`/`REFERENCES`/`TRIGGER` → proposed migration 0004 (`supabase/proposed/`, needs approval) |
 
 Not done, each needing its own approval: `pnpm bootstrap:admin`, hosted Authentication settings, migration 0004, deployment, AI integration.
+
+### 9a. Migration 0004 (2026-10-20)
+
+Same path, same guards: ref confirmed, file sha256 `3cb873b4…` identical to the reviewed version, `list-remote` showed `20261019140000` local only, dry-run listed exactly that file, `pnpm supabase:hosted push` run once (exit 0), read-only verification afterwards (`docs/DAILY_LOG.md`). Review: `docs/PRIVILEGE_HARDENING_REVIEW.md`.

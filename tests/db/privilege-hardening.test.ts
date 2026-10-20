@@ -6,15 +6,17 @@ import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
 import { HOSTED_DEFAULT_PRIVILEGES_SQL } from "../../scripts/db/local-schema";
 
 /**
- * Validates the PROPOSED migration supabase/proposed/20261019140000_privilege_hardening.sql
- * in an isolated database that first reproduces the hosted starting state: Supabase's
- * per-schema default privileges (TRUNCATE, REFERENCES, TRIGGER, MAINTAIN on every new table
- * for anon, authenticated and service_role) in force while migrations 0001-0003 run, exactly
- * as measured on the hosted project on 2026-10-20. T30 in docs/TEST_PLAN.md.
+ * Validates migration 0004 (supabase/migrations/20261019140000_privilege_hardening.sql) in an
+ * isolated database that first reproduces the hosted starting state: Supabase's per-schema
+ * default privileges (TRUNCATE, REFERENCES, TRIGGER, MAINTAIN on every new table for anon,
+ * authenticated and service_role) in force while migrations 0001-0003 run, exactly as
+ * measured on the hosted project on 2026-10-20; then applies 0004 and checks the result.
+ * T30 in docs/TEST_PLAN.md. Reviewed in docs/PRIVILEGE_HARDENING_REVIEW.md.
  */
 
 const DB_NAME = "talentflow_hardening";
-const PROPOSAL = path.resolve("supabase/proposed/20261019140000_privilege_hardening.sql");
+const MIGRATIONS_DIR = path.resolve("supabase/migrations");
+const HARDENING_FILE = "20261019140000_privilege_hardening.sql";
 const PRIVS = [
   "SELECT",
   "INSERT",
@@ -48,6 +50,10 @@ function withDatabase(url: string, name: string): string {
   const parsed = new URL(url);
   parsed.pathname = `/${name}`;
   return parsed.toString();
+}
+
+async function applyMigration(file: string): Promise<void> {
+  await db.query(await readFile(path.join(MIGRATIONS_DIR, file), "utf8"));
 }
 
 /** Privileges each public table grants to `role`, sorted, keyed by table name. */
@@ -94,12 +100,14 @@ beforeAll(async () => {
   db = new pg.Client({ connectionString: withDatabase(baseUrl, DB_NAME) });
   await db.connect();
 
-  const migrationsDir = path.resolve("supabase/migrations");
-  const files = (await readdir(migrationsDir)).filter((f) => f.endsWith(".sql")).sort();
+  const files = (await readdir(MIGRATIONS_DIR)).filter((f) => f.endsWith(".sql")).sort();
+  if (!files.includes(HARDENING_FILE)) {
+    throw new Error(`${HARDENING_FILE} not found in ${MIGRATIONS_DIR}`);
+  }
   await db.query(await readFile(path.resolve("scripts/db/local-auth-shim.sql"), "utf8"));
   await db.query(HOSTED_DEFAULT_PRIVILEGES_SQL);
-  for (const file of files) {
-    await db.query(await readFile(path.join(migrationsDir, file), "utf8"));
+  for (const file of files.filter((f) => f < HARDENING_FILE)) {
+    await applyMigration(file);
   }
 });
 
@@ -134,9 +142,9 @@ describe("state after migrations 0001-0003 with Supabase's default privileges (h
   });
 });
 
-describe("proposed migration 0004", () => {
+describe("migration 0004 (privilege hardening)", () => {
   beforeAll(async () => {
-    await db.query(await readFile(PROPOSAL, "utf8"));
+    await applyMigration(HARDENING_FILE);
   });
 
   it("leaves authenticated with exactly the DML that migration 0002 granted", async () => {
@@ -216,7 +224,7 @@ describe("proposed migration 0004", () => {
 
   it("can be applied a second time without error or change", async () => {
     const before = await privilegesFor("authenticated");
-    await db.query(await readFile(PROPOSAL, "utf8"));
+    await applyMigration(HARDENING_FILE);
     expect(await privilegesFor("authenticated")).toEqual(before);
   });
 });
