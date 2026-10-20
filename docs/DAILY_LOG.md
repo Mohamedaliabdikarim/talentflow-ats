@@ -658,3 +658,37 @@ Routes on the stable server: `/login` 200, `/` 200, `/auth/confirm` (no token) �
 **Admin account (read-only check, no secrets):** the hosted admin user is already `email_confirmed`, has a password set, and has one active session (sign-in recorded at 07:18 UTC) — so activation completed earlier despite the flashing. Nothing was changed; the activation link was not regenerated or opened.
 
 **Safe to retry:** the owner can open `http://localhost:3000/login` and sign in with the email and password already set; the page no longer reloads. Reopening the activation link is not needed. Not done: hosted Auth settings, deployment, AI integration.
+
+## 2026-10-20 (continued) — Security fix: invited admins can no longer skip setting a password (ADR-030)
+
+**Request:** the owner can reach the admin dashboard but never knowingly set a password; investigate as an auth/security issue, determine how that happened, verify the credential state without exposing hashes/tokens, check whether the password step can be skipped, enforce credential establishment while preserving sessions and recovery, apply a minimal production-safe fix, add regression tests. Read-only hosted checks only; no session revoke, password change, recovery link, user creation or hosted Auth change without separate approval.
+
+**Correction to an earlier claim.** My 2026-10-20 bootstrap-verification entry stated the admin "has a password set". That was over-stated. The read-only check only showed `encrypted_password` is a non-empty bcrypt; that does **not** prove the user chose it. GoTrue can populate `encrypted_password` during an invite. I should not have presented it as the user having set a password.
+
+**Read-only evidence (no secret material; booleans/lengths/timestamps only):** one auth user; `encrypted_password` is a 60-char bcrypt that does **not** verify against the empty string; `invited_at` 07:00:49; `confirmed_at` = `email_confirmed_at` = `last_sign_in_at` 07:18:04, with the row's `updated_at` ~24 ms later (consistent with the confirm operation's own write, far too fast to be a human completing a separate set-password form); one AAL1 session; no MFA; GoTrue `audit_log_entries` empty. Conclusion: a credential exists, but there is no evidence the user established it, and the timing is inconsistent with a human-completed set-password step.
+
+**Root cause (proven from code, not inference):** the set-password step was not enforced. `/auth/confirm` runs `verifyOtp`, which creates a full session; the redirect to `/auth/set-password` was advisory. `requireUser()` only checked that a session existed, so a verified-but-passwordless invite session reached `/admin` (admin layout checks `requireUser` + `isPlatformAdmin` only). Reaching `/admin` still required holding the single-use invite link, so this was not open to a stranger, but an invited admin could skip establishing their own password, leaving the account with a credential they do not control.
+
+**Fix (code-only; no migration, no hosted Auth change):**
+
+- `requireUser(returnTo?, { allowWithoutPassword? })` now redirects a signed-in user whose `app_metadata.password_set !== true` to `/auth/set-password` before any protected route; the session is never revoked, only routed. Every protected layout and Server Action already funnels through `requireUser` (directly or via `requirePlatformAdmin` / `requireOrgAccess`), so this one chokepoint covers them all. The set-password page and its action pass `allowWithoutPassword: true`.
+- `setPasswordAction` marks `app_metadata.password_set = true` through the service role (`createAdminSupabase`) after the password is saved, merging to preserve GoTrue's provider keys, records an `auth.password_established` audit event, then activates memberships and redirects. `app_metadata` is writable only by the service role, so a user cannot forge the flag.
+- `CurrentUser` gained `passwordSet`; `getCurrentUser` derives it from the Auth-server copy of `app_metadata` (so a completed set-password is reflected immediately). Recovery is unaffected: a recovery link lands on set-password, which sets the flag.
+
+**Why not a schema migration:** the flag lives in GoTrue `app_metadata`, set at runtime, so no DDL and no hosted-Auth change. The local app enforces it as soon as it runs the new code; production enforces it on deploy.
+
+**Regression tests:** `tests/unit/auth-guards.test.ts` (requireUser routes a passwordless session to set-password, allows the set-password page itself, checks session before password; `requirePlatformAdmin` and `requireOrgAccess` route a passwordless caller to set-password) and `tests/unit/set-password-action.test.ts` (sets the flag via the service role merging provider keys, audits, redirects; does not set the flag if the password update fails; surfaces an error instead of a silent success if the flag write fails; rejects mismatched passwords before any write).
+
+**Tests run and exact results:**
+
+| Command                                           | Result                              |
+| ------------------------------------------------- | ----------------------------------- |
+| `pnpm lint` / `pnpm typecheck`                    | Pass                                |
+| `pnpm test`                                       | 118 passed / 118 (11 files; +9 new) |
+| `pnpm db:verify`                                  | 48 passed / 48                      |
+| `pnpm build`                                      | Compiled successfully (standalone)  |
+| `pnpm test:e2e` (smoke + accessibility + landing) | 24 passed                           |
+
+**Effect for the existing admin:** the account has no `app_metadata.password_set`, so on the next protected navigation the local app routes it to `/auth/set-password`, where the owner sets a password they choose; that submission (the owner's own action) sets the flag. I did not set a password, revoke the session, create a recovery link or change any hosted Auth setting.
+
+**Safest next step:** on `http://localhost:3000` open any protected page; you will be sent to set a password. Choose one of at least 10 characters. After that you have full access and future sign-ins use that password. Not done: hosted Auth settings, deployment, AI integration.

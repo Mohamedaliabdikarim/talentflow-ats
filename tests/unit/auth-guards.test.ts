@@ -19,6 +19,7 @@ vi.mock("next/navigation", () => ({
 type FakeOptions = {
   user?: { id: string; email: string } | null;
   isAdmin?: boolean;
+  passwordSet?: boolean;
   organization?: { id: string; name: string; slug: string; status: string } | null;
   membershipRole?: string | null;
 };
@@ -48,7 +49,12 @@ vi.mock("@/lib/supabase/server", () => ({
     auth: {
       getUser: async () =>
         fake.user
-          ? { data: { user: fake.user }, error: null }
+          ? {
+              data: {
+                user: { ...fake.user, app_metadata: { password_set: fake.passwordSet ?? true } },
+              },
+              error: null,
+            }
           : { data: { user: null }, error: null },
     },
     rpc: async (name: string) => {
@@ -63,6 +69,7 @@ const { getOrganizationContext, requireOrgAccess, requirePlatformAdmin, requireU
   await import("@/server/auth");
 
 const alice = { id: "11111111-1111-4111-8111-111111111111", email: "alice@example.test" };
+const aliceResolved = { ...alice, passwordSet: true };
 const acme = {
   id: "22222222-2222-4222-8222-222222222222",
   name: "Acme",
@@ -73,6 +80,7 @@ const acme = {
 beforeEach(() => {
   fake.user = alice;
   fake.isAdmin = false;
+  fake.passwordSet = true;
   fake.organization = acme;
   fake.membershipRole = "member";
   redirectMock.mockClear();
@@ -86,8 +94,27 @@ describe("requireUser", () => {
     );
   });
 
-  it("returns the verified user when signed in", async () => {
-    await expect(requireUser()).resolves.toEqual(alice);
+  it("returns the verified user when signed in and a password is established", async () => {
+    await expect(requireUser()).resolves.toEqual(aliceResolved);
+  });
+
+  it("routes a signed-in user who has not set a password to the set-password page", async () => {
+    fake.passwordSet = false;
+    await expect(requireUser("/admin")).rejects.toThrow("REDIRECT:/auth/set-password");
+  });
+
+  it("lets the set-password page itself load for a user without a password", async () => {
+    fake.passwordSet = false;
+    await expect(
+      requireUser("/auth/set-password", { allowWithoutPassword: true }),
+    ).resolves.toEqual({ ...alice, passwordSet: false });
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it("checks the session before the password, so signed-out still goes to login", async () => {
+    fake.user = null;
+    fake.passwordSet = false;
+    await expect(requireUser("/admin")).rejects.toThrow("REDIRECT:/login?next=%2Fadmin");
   });
 });
 
@@ -98,7 +125,14 @@ describe("requirePlatformAdmin", () => {
 
   it("accepts platform admins", async () => {
     fake.isAdmin = true;
-    await expect(requirePlatformAdmin()).resolves.toEqual(alice);
+    await expect(requirePlatformAdmin()).resolves.toEqual(aliceResolved);
+  });
+
+  it("sends a platform admin without an established password to set-password first", async () => {
+    // An invited admin on a verified session but no password must not reach admin actions.
+    fake.isAdmin = true;
+    fake.passwordSet = false;
+    await expect(requirePlatformAdmin()).rejects.toThrow("REDIRECT:/auth/set-password");
   });
 });
 
@@ -138,5 +172,10 @@ describe("requireOrgAccess", () => {
   it("throws an authorization error instead of leaking existence", async () => {
     fake.membershipRole = null;
     await expect(requireOrgAccess("acme")).rejects.toMatchObject({ name: "AuthorizationError" });
+  });
+
+  it("routes a member without an established password to set-password first", async () => {
+    fake.passwordSet = false;
+    await expect(requireOrgAccess("acme")).rejects.toThrow("REDIRECT:/auth/set-password");
   });
 });

@@ -13,7 +13,18 @@ import type { Enums } from "@/lib/supabase/database.types";
  * with React `cache`, so layouts, pages and actions can call them freely.
  */
 
-export type CurrentUser = { id: string; email: string };
+export type CurrentUser = {
+  id: string;
+  email: string;
+  /**
+   * True once the user has established their own password through the set-password flow.
+   * Backed by Supabase `app_metadata.password_set`, which only the service role can write
+   * (src/server/actions/auth.ts), so a user cannot forge it. Invited/magic-link/recovery
+   * sessions start without it, so they must set a password before reaching protected routes
+   * (docs/SECURITY.md §3, ADR-030).
+   */
+  passwordSet: boolean;
+};
 
 export type OrganizationContext = {
   id: string;
@@ -42,14 +53,36 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const supabase = await createServerSupabase();
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) return null;
-  return { id: data.user.id, email: data.user.email ?? "" };
+  // app_metadata comes from the Auth server and cannot be set by the user; getUser()
+  // returns the current value, so the flag reflects a completed set-password immediately.
+  const passwordSet = data.user.app_metadata?.password_set === true;
+  return { id: data.user.id, email: data.user.email ?? "", passwordSet };
 });
 
-/** Redirects to the login page (remembering the current path) when signed out. */
-export async function requireUser(returnTo?: string): Promise<CurrentUser> {
+export type RequireUserOptions = {
+  /**
+   * Allow a signed-in user who has not yet established a password. Only the set-password
+   * page and its action pass this; every other protected route leaves it false so an
+   * invited/magic-link/recovery session is sent to set a password first.
+   */
+  allowWithoutPassword?: boolean;
+};
+
+/**
+ * Requires a signed-in user. Redirects to the login page when signed out, and to the
+ * set-password page when the user has an active session but has never established a
+ * password (ADR-030). The session is never revoked; the user is only routed.
+ */
+export async function requireUser(
+  returnTo?: string,
+  options: RequireUserOptions = {},
+): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) {
     redirect(returnTo ? `/login?next=${encodeURIComponent(returnTo)}` : "/login");
+  }
+  if (!user.passwordSet && !options.allowWithoutPassword) {
+    redirect("/auth/set-password");
   }
   return user;
 }

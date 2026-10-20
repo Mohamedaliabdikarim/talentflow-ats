@@ -33,6 +33,7 @@
 - Sessions are HttpOnly cookies managed by `@supabase/ssr`; `proxy.ts` refreshes tokens on each request.
 - Invite links are generated server-side with the admin API and shown once to the admin; they expire with the project's email OTP setting (default one hour).
 - Sign-out revokes the session server-side.
+- **Credential establishment is enforced (ADR-030).** Verifying an invite, magic link or recovery link creates a session but not a user-chosen password. `requireUser()` therefore routes any signed-in user whose `app_metadata.password_set` is not `true` to `/auth/set-password` before any protected route; the flag is set (service-role only, so it cannot be forged by a user) when they complete that form. The session is never revoked, only routed, so legitimate sessions and the recovery flow are preserved.
 
 ## 4. Authorization layers
 

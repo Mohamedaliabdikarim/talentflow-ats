@@ -9,7 +9,8 @@ export type AuditAction =
   | "admin.context_entered"
   | "membership.activated"
   | "auth.signed_in"
-  | "auth.signed_out";
+  | "auth.signed_out"
+  | "auth.password_established";
 
 export type AuditDetails = {
   organizationId?: string | null;

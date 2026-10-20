@@ -30,7 +30,18 @@ vi.mock("@/lib/supabase/server", () => ({
     auth: {
       getUser: async () =>
         state.signedIn
-          ? { data: { user: { id: "u1", email: "admin@example.test" } }, error: null }
+          ? {
+              data: {
+                // app_metadata.password_set: a fully onboarded admin; the set-password gate
+                // (requireUser) is covered in tests/unit/auth-guards.test.ts.
+                user: {
+                  id: "u1",
+                  email: "admin@example.test",
+                  app_metadata: { password_set: true },
+                },
+              },
+              error: null,
+            }
           : { data: { user: null }, error: null },
     },
     rpc: async () => ({ data: state.isAdmin, error: null }),

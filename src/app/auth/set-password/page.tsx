@@ -6,7 +6,8 @@ import { requireUser } from "@/server/auth";
 export const metadata: Metadata = { title: "Set your password" };
 
 export default async function SetPasswordPage() {
-  const user = await requireUser("/auth/set-password");
+  // allowWithoutPassword: this page is the destination for users who have not set one yet.
+  const user = await requireUser("/auth/set-password", { allowWithoutPassword: true });
 
   return (
     <main id="main" className="flex flex-1 items-center justify-center px-4 py-16">
