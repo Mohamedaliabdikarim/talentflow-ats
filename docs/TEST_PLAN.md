@@ -143,6 +143,16 @@ Unit count note: 73 before and 74 after the pending-invite refinement in `invite
 | T23 (hosted migrations apply in order)                                                                           | **Verified**                                                                                                                |                                          |
 | `pnpm db:verify`                                                                                                 | 36 passed / 36 (4 files)                                                                                                    | adds `privilege-hardening.test.ts` (T30) |
 
+### 2026-10-20 — First platform admin created on the hosted project (approved `--apply`)
+
+| Command / call                                               | Result                                                                                                                                         | Notes                                               |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Chained pre-flight (ref ×3, dry run with the approved email) | ref agrees; 0 admins, 0 users                                                                                                                  | stops on any mismatch                               |
+| `pnpm bootstrap:admin … --apply --link-file <outside repo>`  | exit 0; user `dc43b2a0-…0823` (invite); link written to a file restricted to the owner's Windows account (ACL `(F)` only)                      | token never printed                                 |
+| MCP `execute_sql` verification                               | auth user (unconfirmed, no password yet), profile (trigger fired), admin row, `admin.bootstrapped` audit row; 0 orgs/memberships; 4 migrations | all as planned                                      |
+| T31 (bootstrap safeguards, apply path)                       | **Verified (hosted)**                                                                                                                          |                                                     |
+| T24 (invite → confirm → set password)                        | invite generated; confirm and password pending the owner                                                                                       | verified read-only once the owner has used the link |
+
 ### 2026-10-20 — First-admin bootstrap dry run on the hosted project (reads only, approved)
 
 | Command / call                                                  | Result                                                                                            | Notes                                      |

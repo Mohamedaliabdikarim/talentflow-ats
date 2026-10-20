@@ -6,6 +6,12 @@ Read `docs/spec/TALENTFLOW_MASTER_SPEC_V2.md`, this file and the latest entry of
 
 Multi-tenant applicant tracking system. Next.js 16 (App Router, React 19, strict TypeScript, Tailwind CSS 4, shadcn/ui on Radix, Motion for React), Supabase (Auth + PostgreSQL + RLS), Azure App Service hosting. Platform admins provision customer organizations and can work inside any customer workspace; customer users manage jobs, candidates and a Kanban pipeline of applications. Tenant isolation is enforced in the database.
 
+## Product principle (owner, 2026-10-20)
+
+> **"Build the first version like it's the last version."**
+
+TalentFlow is a real, production-oriented SaaS product for its first paying customer, not a disposable coding assessment or a visual demo. Prioritize complete end-to-end workflows, security, accessibility, excellent UX, consistent premium design and maintainable architecture. No fake functionality, placeholder buttons, misleading AI claims, or shortcuts that compromise production behaviour. Keep scope disciplined and protect the 2026-10-26 delivery deadline: finish the required ATS workflows before expanding optional features. (ADR-028)
+
 ## Non-negotiable rules
 
 1. **English everywhere**: code, comments, UI strings, docs, tests, commits.

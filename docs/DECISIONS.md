@@ -355,3 +355,16 @@ Chronological architecture decision records. Statuses: Proposed | Approved | Imp
 - Implementation reference: `scripts/bootstrap-admin.ts`, `scripts/env/check-local.mjs` (`bootstrap` profile), `tests/unit/bootstrap-admin.test.ts`, `tests/db/bootstrap-admin.test.ts`, `docs/BOOTSTRAP_ADMIN_PLAN.md`.
 - Verification evidence: `pnpm test` 109/109, `pnpm db:verify` 48/48 (both modes), 2026-10-20 (`docs/DAILY_LOG.md`).
 - Status: Implemented (local); hosted bootstrap awaiting the owner's approval
+
+### ADR-028 — Product principle: "Build the first version like it's the last version."
+
+- Date: 2026-10-20
+- Context / problem: TalentFlow started from an assessment-style specification with a fixed delivery date (2026-10-26). Without an explicit principle, a team under deadline pressure drifts towards demo-grade shortcuts: placeholder buttons, mocked flows, oversold AI, untested paths. The owner set the standard in writing.
+- Decision (owner's words): _"Build the first version like it's the last version."_ Treat TalentFlow as a real production-oriented SaaS product for its first paying customer, not a disposable coding assessment or visual demo. Prioritize complete end-to-end workflows, security, accessibility, excellent UX, consistent premium design, and maintainable architecture. No fake functionality, placeholder buttons, misleading AI claims, or shortcuts that compromise production behavior. Keep scope disciplined and protect the October 26 delivery deadline. Finish the required ATS workflows before expanding optional features.
+- How it is applied: (1) every shipped control does what it says, or it is not shipped; features that are not implemented are labelled "In development" and never simulated (the landing page already follows this, ADR-025); (2) security and tenant isolation stay database-enforced and verified against the hosted project before any user depends on them (migrations 0001–0004, ADR-026); (3) hosted changes remain approval-gated and rehearsed locally first (ADR-027); (4) accessibility checks (axe, keyboard paths, contrast) and the design tokens in `docs/DESIGN.md` are release criteria, not polish; (5) scope order: required ATS workflows (auth, provisioning, jobs, candidates, applications, Kanban, audit) → deployment → optional AI insights, which stay off until approved and are presented honestly; (6) each phase ends with recorded test results in `docs/TEST_PLAN.md` and `docs/DAILY_LOG.md`.
+- Options considered: (a) "demo first, harden later" — rejected: hardening never gets scheduled and the first customer inherits the demo; (b) this principle.
+- Trade-offs / risks: fewer visible features by the deadline than a demo-driven build would show; mitigated by finishing the required workflows first and keeping optional features explicitly out of scope until approved.
+- Security and privacy implications: none beyond reinforcing the existing rules (`CLAUDE.md`, `docs/SECURITY.md`).
+- Implementation reference: `CLAUDE.md` ("Product principle"), `docs/PRD.md` priorities, `docs/DELIVERY_CHECKLIST.md`.
+- Verification evidence: not applicable (principle); applied through the phase gate checklist.
+- Status: Adopted

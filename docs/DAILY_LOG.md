@@ -588,3 +588,44 @@ The output was passed through a masking filter for key and token patterns as a s
 **Warnings:** none from the script. Notes for the real run: the link host is `http://localhost:3000`, so the local app must run on port 3000 when the link is opened (the preview server on 3100 is unaffected); the hosted Auth settings remain unverified (token lacks `auth_config_read`) but none blocks the bootstrap at defaults; the real run needs the owner's chosen email and display name, which the dry run did not have.
 
 **Verified vs pending:** dry run done; `--apply` waits for the owner's explicit approval with the email and name (plan §4 step 3–4). Not done: hosted user, hosted auth settings, deployment, AI integration.
+
+## 2026-10-20 (continued) — First platform admin created on the hosted project (approved) and verified
+
+**Request:** the owner explicitly approved creating the first hosted platform admin with a stated email and display name (kept out of this log; they are in the owner's message), following `docs/BOOTSTRAP_ADMIN_PLAN.md`: verify the ref, confirm zero admins, run the reviewed script with `--apply --link-file`, store the link outside the repository with restricted access, never expose secrets or the link; afterwards verify the records, report, explain how to open the link, and stop. Also: record the product principle (ADR-028, `CLAUDE.md`). Not approved (not done): hosted Auth settings, deployment, AI integration.
+
+**Execution (one chained script, stops at the first failed check; verbatim, already redacted by the script and re-filtered):**
+
+```text
+=== 1. project reference ===
+env ref: zcxmyaxpftzwpzvmhslm | linked ref: zcxmyaxpftzwpzvmhslm | URL host: zcxmyaxpftzwpzvmhslm.supabase.co | agree: true
+=== 2. zero admins: dry run with the approved email (reads only) ===
+Project zcxmyaxpftzwpzvmhslm (zcxmyaxpftzwpzvmhslm.supabase.co); app URL http://localhost:3000; mode DRY RUN.
+Existing platform admins: 0; auth users: 0.
+Would create the auth user by invitation, insert the platform_admins row and an admin.bootstrapped audit row, then print a one-time link.
+DRY RUN: nothing was created or written. Re-run with --apply to proceed.
+=== 3. apply (once) with the link written outside the repository ===
+Project zcxmyaxpftzwpzvmhslm (zcxmyaxpftzwpzvmhslm.supabase.co); app URL http://localhost:3000; mode APPLY.
+Existing platform admins: 0; auth users: 0.
+Platform admin ensured for user dc43b2a0-b9bc-41fd-a153-28184ffe0823 (invite).
+One-time link (single use; expires per the project's email OTP setting; share privately, never paste into chat or commit):
+Written to C:/Users/moi-a/talentflow-admin-link.txt (delete the file after use): http://localhost:3000/auth/confirm?token_hash=[redacted]&type=invite&next=%2Fauth%2Fset-password
+=== 4. restrict the link file to the current Windows user ===
+processed file: C:\Users\moi-a\talentflow-admin-link.txt
+C:\Users\moi-a\talentflow-admin-link.txt MOHAMED\moi-a:(F)
+link file bytes: 143 (content never displayed)
+script exit=0
+```
+
+**Read-only verification (MCP `execute_sql`, one query; booleans instead of personal data):**
+
+| Record                   | Result                                                                                                                                                                                                                                                         |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth.users`             | 1 row, id `dc43b2a0-b9bc-41fd-a153-28184ffe0823`; email and `full_name` metadata match the approved values; `aud`/`role` = `authenticated`; `invited_at` set; **not yet confirmed**, no password, confirmation token present (expected until the link is used) |
+| `public.profiles`        | 1 row, same id; email and full name match — the `auth.users` → `profiles` trigger fired on the hosted project for the first time                                                                                                                               |
+| `public.platform_admins` | 1 row: `user_id` = the admin, `granted_by` NULL, `note` "bootstrap script"                                                                                                                                                                                     |
+| `public.audit_events`    | 1 row: id 1, `admin.bootstrapped`, actor = target = the admin, `organization_id` NULL, metadata `{source, project_ref, link_type: "invite"}` — no personal data                                                                                                |
+| Other tables             | organizations 0, memberships 0; migrations 4                                                                                                                                                                                                                   |
+
+**Local app for the activation:** `pnpm dev -p 3000 -H 127.0.0.1` started in the background against the hosted project (`.env.local`), because the link's host is `http://localhost:3000`; the preview server on port 3100 keeps running. The owner opens the link from the restricted file privately, sets a password (≥ 10 characters) on `/auth/set-password`, lands on `/admin`, then deletes the file.
+
+**Verified vs pending:** admin account, profile, admin row and audit row verified on the hosted project. Pending (owner): opening the link and setting the password (then `email_confirmed_at`, a password and `last_sign_in_at` appear; verified read-only afterwards, T24 invite → confirm → set password). Not done: hosted Auth settings, deployment, AI integration.
