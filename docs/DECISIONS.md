@@ -394,3 +394,16 @@ Chronological architecture decision records. Statuses: Proposed | Approved | Imp
 - Implementation reference: `src/server/auth.ts` (`requireUser`, `getCurrentUser`, `CurrentUser.passwordSet`), `src/server/actions/auth.ts` (`setPasswordAction`), `src/app/auth/set-password/page.tsx`, `src/server/audit.ts` (`auth.password_established`).
 - Verification evidence: `tests/unit/auth-guards.test.ts`, `tests/unit/set-password-action.test.ts`; full suite green 2026-10-20 (`docs/DAILY_LOG.md`).
 - Status: Implemented (local + tests); enforced on the hosted project through the running app, which required no hosted change
+
+### ADR-031 — Reissue invitations by reusing the token, never the membership row
+
+- Date: 2026-10-20
+- Context / problem: invitation links expire in about an hour. The original `inviteUserAction` inserts the membership after generating the link, so re-inviting someone who is already a member fails on the `organization_memberships_unique` constraint and the fresh link is never surfaced. A platform admin had no way to resend a link for a pending invitee.
+- Options considered: (a) delete and recreate the membership — loses history, risks downgrading an active member, and is unnecessary; (b) add an `invited_at`/token column and a migration — schema change for no benefit, since Supabase already holds the token; (c) separate the two concerns: a resend action that only regenerates the auth token for an already-invited account and never writes a membership row.
+- Chosen approach: (c). `reissueInvitationAction` acts only when the membership status is `invited`, generates a fresh one-time token for the existing account, and leaves the membership untouched. An active membership is refused; a missing one returns a clear error. The unique `(organization_id, user_id)` constraint (proven in a DB test) guarantees no duplicate, because nothing is inserted. The new token invalidates the old link, so expired/used links fail safely at `/auth/confirm`.
+- Why this approach: no schema change, no risk to active members, full auditability (`user.invite_reissued`, ids only), and the one-time link is shown once through the same `OneTimeLink` component. Consistent with ADR-006/007 and the product principle: a real, safe onboarding-recovery path rather than a quick delete-recreate hack.
+- Trade-offs / risks: the resend uses the service role to read the membership and the account email; it is gated behind `requirePlatformAdmin` and scoped to a single membership id. No automated end-to-end test through the real Auth server (hosted GoTrue), covered instead by unit, DB and jsdom tests.
+- Security and privacy implications: authorization unchanged (platform admin only); audit metadata carries ids only; links are never logged; organization isolation is unaffected (no cross-tenant read or write).
+- Implementation reference: `src/server/actions/admin.ts` (`reissueInvitationAction`), `src/components/forms/resend-invite-button.tsx`, `src/components/views/members-table.tsx` (`showResend`), `src/lib/validation/admin.ts`, `src/server/audit.ts`.
+- Verification evidence: `tests/unit/admin-actions.test.ts`, `tests/db/membership-activation.test.ts`, `tests/unit/resend-invite-button.test.tsx`; full suite green 2026-10-20 (`docs/DAILY_LOG.md`).
+- Status: Implemented (local + tests); no hosted change required

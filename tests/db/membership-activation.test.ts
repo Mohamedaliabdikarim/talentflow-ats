@@ -95,3 +95,24 @@ describe("activate_my_memberships", () => {
     }
   });
 });
+
+describe("membership uniqueness (the reissue flow relies on this invariant)", () => {
+  it("rejects a second membership for the same organization and user", async () => {
+    // Resend must never insert, because a duplicate (organization_id, user_id) is blocked
+    // by organization_memberships_unique. Proven here so the app can rely on it.
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      await expect(
+        client.query(
+          `insert into public.organization_memberships (organization_id, user_id, status)
+           values ($1, $2, 'invited')`,
+          [ids.org, ids.invitedUser],
+        ),
+      ).rejects.toMatchObject({ code: "23505" });
+    } finally {
+      await client.query("rollback");
+      client.release();
+    }
+  });
+});

@@ -716,3 +716,38 @@ Routes on the stable server: `/login` 200, `/` 200, `/auth/confirm` (no token) �
 Skipped E2E are deliberate `test.skip`s: the screenshot-capture spec is opt-in (`SCREENSHOTS=1`) and desktop-only, and the mutating preview board test runs on a single project to avoid a shared-store race. No functional coverage was skipped.
 
 **Not done (boundaries honoured):** no hosted writes, no invitations sent, no hosted Auth change, no deployment, no AI, no new admin or password reset, the established admin account untouched. Awaiting approval to create the first customer organization.
+
+## 2026-10-20 (continued) — Resend/reissue invitation for pending memberships (ADR-031)
+
+**Request:** add a production-safe way for a platform admin to reissue a fresh invitation link for an existing PENDING membership (links expire in ~1 hour), without creating a duplicate membership or touching an active one; make it discoverable in the admin UI; add unit, database and browser tests; no hosted writes or real invitations.
+
+**No hosted migration needed.** The flow reuses the existing tables and the `organization_memberships_unique (organization_id, user_id)` constraint; reissue never inserts or updates a membership row, so there is no schema change.
+
+**What changed (code):**
+
+- `reissueInvitationAction` (`src/server/actions/admin.ts`): `requirePlatformAdmin`, validate a membership id, look up the membership through the service role, and **only** proceed when its status is `invited`. It generates a fresh one-time token for that already-invited account (reusing `generateUserLink`, which issues a magic-link token for an existing account), writes a `user.invite_reissued` audit row (ids only), and returns the link once. It does not insert or modify any membership, so an active membership can never be re-invited or downgraded, and no duplicate can be created. Generating a new token invalidates the previous link, so an expired or already-used link fails safely at `/auth/confirm` (generic "expired_link" message).
+- `ResendInviteButton` (`src/components/forms/resend-invite-button.tsx`): a client control shown only for pending members; on success it renders the one-time link via `OneTimeLink` (shown once, never logged), on failure it shows a clear message and keeps the button.
+- `MembersTable` gained an opt-in `showResend` column, enabled only in the platform-admin organization view (`/admin/organizations/[id]`), never in the customer workspace or preview.
+- New audit action `user.invite_reissued`; new `reissueInvitationSchema`.
+
+**Tests (added):**
+
+- Unit (`tests/unit/admin-actions.test.ts`): non-admin refused without touching the service role; pending membership → fresh link + `user.invite_reissued` audit with no email/token and **no membership insert**; active membership → error, no link, no audit; no membership → clear error; malformed id → error before any service-role call.
+- Database (`tests/db/membership-activation.test.ts`): a second membership for the same `(organization_id, user_id)` is rejected with `23505`, the invariant that lets the reissue flow avoid duplicates.
+- Browser (jsdom, `tests/unit/resend-invite-button.test.tsx`): submits the membership id and shows the one-time link on success; shows the error and keeps the control on refusal.
+
+**Verification:**
+
+| Command                              | Result                             |
+| ------------------------------------ | ---------------------------------- |
+| `pnpm lint` / `pnpm typecheck`       | Pass                               |
+| `pnpm test` (unit + jsdom component) | 125 passed / 125 (12 files)        |
+| `pnpm db:verify`                     | 49 passed / 49                     |
+| `pnpm build`                         | Compiled successfully (standalone) |
+| `pnpm test:e2e`                      | 45 passed, 55 skipped              |
+
+Honest note on skips/flake: the 55 skipped E2E are deliberate (`SCREENSHOTS=1` opt-in captures and the single-project mutating board test). The first full E2E run had one failure, the preview "persists a menu move" board test, which passed alone (11/11) and on a full re-run (45 passed); it is a known timing-sensitive test under full-suite contention, unrelated to this change (which touches only the admin members view).
+
+**Remaining risks:** reissue still has no automated end-to-end test through the real Auth server (needs hosted GoTrue); it is covered by unit/DB/jsdom tests and the existing confirm-route safe-failure behaviour. A full browser E2E of the authenticated admin flow remains dependent on hosted auth (T24 family).
+
+**Boundaries honoured:** no hosted organizations, memberships or users created; no real invitations; no hosted Auth change; no deployment; the established admin account untouched; no links, tokens or secrets exposed. No migration applied (none needed).

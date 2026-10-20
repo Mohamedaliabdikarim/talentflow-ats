@@ -10,6 +10,7 @@ import {
   createOrganizationSchema,
   grantPlatformAdminSchema,
   inviteUserSchema,
+  reissueInvitationSchema,
 } from "@/lib/validation/admin";
 import { slugify } from "@/lib/validation/organization";
 import { runAction } from "@/server/actions/run";
@@ -135,6 +136,74 @@ export async function inviteUserAction(
         ? "Added as an active member. Share the sign-in link if they need one."
         : "Invitation created. Copy the link now; it is shown only once.",
       data: { inviteUrl, linkType: link.linkType, existingUser: link.existingUser },
+    };
+  });
+}
+
+/**
+ * Reissues a one-time invitation link for a membership that is still PENDING ('invited'),
+ * for use when the original link expired or was lost. It never creates or modifies a
+ * membership row: it only generates a fresh token for the already-invited account, so the
+ * unique (organization_id, user_id) membership is untouched and an active membership can
+ * never be re-invited or downgraded through this path. Generating the token invalidates any
+ * earlier link, so an expired or already-used link fails safely at /auth/confirm.
+ */
+export async function reissueInvitationAction(
+  _previous: ActionState<InviteResult>,
+  formData: FormData,
+): Promise<ActionState<InviteResult>> {
+  return runAction<InviteResult>(async () => {
+    await requirePlatformAdmin();
+    const parsed = reissueInvitationSchema.safeParse({
+      membershipId: formData.get("membershipId"),
+    });
+    if (!parsed.success) {
+      return errorState("Check the highlighted fields", fieldErrorsFromIssues(parsed.error.issues));
+    }
+
+    const service = createAdminSupabase();
+    const { data: membership, error: lookupError } = await service
+      .from("organization_memberships")
+      .select("id, organization_id, user_id, status")
+      .eq("id", parsed.data.membershipId)
+      .maybeSingle();
+    if (lookupError) throw new Error(`membership lookup failed: ${lookupError.message}`);
+    if (!membership) {
+      return errorState("No invitation found for that member.");
+    }
+    if (membership.status !== "invited") {
+      return errorState(
+        "That member is already active, so there is no pending invitation to resend.",
+      );
+    }
+
+    const { data: account, error: userError } = await service.auth.admin.getUserById(
+      membership.user_id,
+    );
+    if (userError || !account.user?.email) {
+      return errorState("Could not find the invited account to reissue a link for.");
+    }
+
+    const link = await generateUserLink(service, account.user.email, undefined);
+    if (!link.ok) return errorState(link.message);
+
+    await recordAuditEvent("user.invite_reissued", {
+      organizationId: membership.organization_id,
+      targetType: "user",
+      targetId: membership.user_id,
+    });
+    revalidatePath(`/admin/organizations/${membership.organization_id}`);
+
+    const inviteUrl = buildInviteUrl(
+      getPublicEnv().NEXT_PUBLIC_APP_URL,
+      link.tokenHash,
+      link.linkType,
+      "/auth/set-password",
+    );
+    return {
+      status: "success",
+      message: "New invitation link created. Copy it now; it is shown only once.",
+      data: { inviteUrl, linkType: link.linkType, existingUser: false },
     };
   });
 }

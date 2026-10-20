@@ -5,6 +5,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 export type AuditAction =
   | "organization.created"
   | "user.invited"
+  | "user.invite_reissued"
   | "admin.granted"
   | "admin.context_entered"
   | "membership.activated"

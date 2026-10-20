@@ -18,6 +18,10 @@ export const inviteUserSchema = z.object({
   role: membershipRoleSchema.default("member"),
 });
 
+export const reissueInvitationSchema = z.object({
+  membershipId: z.uuid("Unknown membership"),
+});
+
 export const grantPlatformAdminSchema = z.object({
   email: z.email("Enter a valid email address").max(254),
   fullName: optionalText(160),

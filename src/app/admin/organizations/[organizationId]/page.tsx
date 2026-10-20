@@ -39,7 +39,7 @@ export default async function OrganizationDetailPage({
         <section className="min-w-0">
           <h2 className="text-lg font-semibold">Members</h2>
           <div className="mt-3">
-            <MembersTable members={members} />
+            <MembersTable members={members} showResend />
           </div>
         </section>
         <section>

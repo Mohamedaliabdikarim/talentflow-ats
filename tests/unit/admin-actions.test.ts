@@ -48,8 +48,57 @@ vi.mock("@/lib/supabase/server", () => ({
   }),
 }));
 
-const { createOrganizationAction, grantPlatformAdminAction, inviteUserAction } =
-  await import("@/server/actions/admin");
+const {
+  createOrganizationAction,
+  grantPlatformAdminAction,
+  inviteUserAction,
+  reissueInvitationAction,
+} = await import("@/server/actions/admin");
+
+const MEMBERSHIP_ID = "44444444-4444-4444-8444-444444444444";
+
+/** A service-role client whose membership lookup returns `membership`. */
+function serviceWithMembership(
+  membership: { id: string; organization_id: string; user_id: string; status: string } | null,
+) {
+  const generateLink = vi
+    .fn()
+    .mockResolvedValueOnce({
+      data: { user: null, properties: null },
+      error: { code: "email_exists", message: "exists" },
+    })
+    .mockResolvedValueOnce({
+      data: {
+        user: { id: "invited-user", last_sign_in_at: null },
+        properties: { hashed_token: "tok-reissue" },
+      },
+      error: null,
+    });
+  const getUserById = vi.fn(async () => ({
+    data: { user: { id: "invited-user", email: "pending@example.test" } },
+    error: null,
+  }));
+  const insert = vi.fn(async () => ({ error: null }));
+  return {
+    client: {
+      from: (table: string) => ({
+        insert,
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () =>
+              table === "organization_memberships"
+                ? { data: membership, error: null }
+                : { data: null, error: null },
+          }),
+        }),
+      }),
+      auth: { admin: { generateLink, getUserById } },
+    },
+    insert,
+    getUserById,
+    generateLink,
+  };
+}
 
 function form(entries: Record<string, string>): FormData {
   const data = new FormData();
@@ -84,6 +133,16 @@ describe("provisioning actions as a non-admin", () => {
     expect(invite.status).toBe("error");
     expect(grant.status).toBe("error");
     expect(createAdminSupabase).not.toHaveBeenCalled();
+  });
+
+  it("reissueInvitationAction refuses a non-admin without touching the service role", async () => {
+    const result = await reissueInvitationAction(
+      { status: "idle" },
+      form({ membershipId: MEMBERSHIP_ID }),
+    );
+    expect(result).toEqual({ status: "error", message: "Platform admin privileges are required" });
+    expect(createAdminSupabase).not.toHaveBeenCalled();
+    expect(recordAuditEvent).not.toHaveBeenCalled();
   });
 
   it("signed-out callers are redirected to login before anything else happens", async () => {
@@ -247,5 +306,87 @@ describe("inviteUserAction as an admin", () => {
       expect(result.data.inviteUrl).toContain("next=%2Fauth%2Fset-password");
     }
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({ status: "invited" }));
+  });
+});
+
+describe("reissueInvitationAction as an admin", () => {
+  it("reissues a fresh link for a pending membership without creating or changing a membership", async () => {
+    state.isAdmin = true;
+    const { client, insert, getUserById } = serviceWithMembership({
+      id: MEMBERSHIP_ID,
+      organization_id: "33333333-3333-4333-8333-333333333333",
+      user_id: "invited-user",
+      status: "invited",
+    });
+    createAdminSupabase.mockReturnValue(client);
+
+    const result = await reissueInvitationAction(
+      { status: "idle" },
+      form({ membershipId: MEMBERSHIP_ID }),
+    );
+
+    expect(result.status).toBe("success");
+    if (result.status === "success") {
+      expect(result.data.inviteUrl).toContain("token_hash=tok-reissue");
+      expect(result.data.inviteUrl).toContain("next=%2Fauth%2Fset-password");
+    }
+    // No membership row is inserted or modified.
+    expect(insert).not.toHaveBeenCalled();
+    expect(getUserById).toHaveBeenCalledWith("invited-user");
+    const auditCall = recordAuditEvent.mock.calls[0] as unknown[];
+    expect(auditCall[0]).toBe("user.invite_reissued");
+    // Audit metadata carries ids only, never the email or the token.
+    expect(JSON.stringify(auditCall)).not.toContain("pending@example.test");
+    expect(JSON.stringify(auditCall)).not.toContain("tok-reissue");
+  });
+
+  it("refuses to reissue for an already-active membership and writes no audit", async () => {
+    state.isAdmin = true;
+    const { client, insert } = serviceWithMembership({
+      id: MEMBERSHIP_ID,
+      organization_id: "33333333-3333-4333-8333-333333333333",
+      user_id: "active-user",
+      status: "active",
+    });
+    createAdminSupabase.mockReturnValue(client);
+
+    const result = await reissueInvitationAction(
+      { status: "idle" },
+      form({ membershipId: MEMBERSHIP_ID }),
+    );
+
+    expect(result.status).toBe("error");
+    if (result.status === "error") {
+      expect(result.message).toContain("already active");
+    }
+    expect(insert).not.toHaveBeenCalled();
+    expect(recordAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it("returns a clear error when no membership matches", async () => {
+    state.isAdmin = true;
+    const { client } = serviceWithMembership(null);
+    createAdminSupabase.mockReturnValue(client);
+
+    const result = await reissueInvitationAction(
+      { status: "idle" },
+      form({ membershipId: MEMBERSHIP_ID }),
+    );
+
+    expect(result).toMatchObject({
+      status: "error",
+      message: "No invitation found for that member.",
+    });
+    expect(recordAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it("rejects a malformed membership id before any service-role call", async () => {
+    state.isAdmin = true;
+    const result = await reissueInvitationAction(
+      { status: "idle" },
+      form({ membershipId: "nope" }),
+    );
+    expect(result.status).toBe("error");
+    expect(createAdminSupabase).not.toHaveBeenCalled();
   });
 });

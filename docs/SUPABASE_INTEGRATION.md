@@ -115,7 +115,7 @@ File: `supabase/migrations/20261019140000_privilege_hardening.sql` (reviewed in 
 ## 8. Invitation links — operational limitations (approved MVP design)
 
 - Links are created by `auth.admin.generateLink` and rebuilt as `/auth/confirm?token_hash=…&type=invite|magiclink&next=…`; the route calls `verifyOtp`, so links work even though they were generated server-side (the PKCE `action_link` would not).
-- A link is single-use and expires after the project's email OTP lifetime (default one hour, configurable up to 24 h). An expired link shows a generic message on the login page; the admin generates a new one from the organization page.
+- A link is single-use and expires after the project's email OTP lifetime (default one hour, configurable up to 24 h). An expired link shows a generic message on the login page; the admin reissues a fresh one from the organization page with the "Resend invite" control on a pending member (ADR-031), which regenerates the token without creating or changing the membership.
 - Links are shown once in the admin UI and copied by the admin; they are not emailed (Supabase's default mailer only delivers to project team members without custom SMTP), not stored, and not logged. Audit rows record user ids and roles only; `redactInviteUrl()` exists for any future log line that might contain a URL.
 - Anyone holding a fresh link can claim the account, so the admin must send it through a private channel.
 - Existing accounts invited to another organization receive a magic link and become active members immediately (they already have a password).
