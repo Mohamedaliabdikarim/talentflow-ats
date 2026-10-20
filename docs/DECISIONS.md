@@ -368,3 +368,16 @@ Chronological architecture decision records. Statuses: Proposed | Approved | Imp
 - Implementation reference: `CLAUDE.md` ("Product principle"), `docs/PRD.md` priorities, `docs/DELIVERY_CHECKLIST.md`.
 - Verification evidence: not applicable (principle); applied through the phase gate checklist.
 - Status: Adopted
+
+### ADR-029 — Disable the Turbopack dev filesystem cache to stop a Next.js 16.4 HMR reload loop
+
+- Date: 2026-10-20
+- Context / problem: On `http://localhost:3000` the login/activation page reloaded many times a second ("Compiling…" flashing). Investigation showed it was not a redirect loop or a React/effect problem (every request was `GET /login 200`; guards and proxy behaved correctly). The Turbopack dev HMR socket sent a perpetual `reloadPage` ("HMR hash mismatch") with an empty build hash while no file changed — a known Next.js 16.4 regression (vercel/next.js #100251, #100267) where, after a `next dev` restart with a warm dev filesystem cache, the first HMR message is `restart`, leaving a stale `hmrVersion`.
+- Options considered: (a) downgrade Next to 16.3.8 — affects production too and is a large change before the deadline; (b) run dev on webpack instead of Turbopack — a bigger behavioural change and our CSS pipeline is wired to `@tailwindcss/turbopack`; (c) clear `.next` on every restart — treats the symptom, the loop returns on the next warm start; (d) set `experimental.turbopackFileSystemCacheForDev: false` — the documented workaround, dev-only, surgical.
+- Chosen approach: (d). `next.config.ts` sets `experimental.turbopackFileSystemCacheForDev: false` with a comment citing the upstream issues and marking it removable once fixed. Production `next build` (standalone, what Azure runs) uses `turbopackFileSystemCacheForBuild` and is unaffected.
+- Why this approach: smallest change that removes the root cause rather than the symptom; touches no application code, so authentication, authorization, RLS and the Supabase clients are unchanged; aligns with ADR-028 (a clearly-documented, scoped workaround, not a hack).
+- Trade-offs / risks: slightly slower cold dev compiles without the dev FS cache; none in production. Revisit when the Next.js fix lands and drop the flag.
+- Security and privacy implications: none; dev-only build setting.
+- Implementation reference: `next.config.ts` (`experimental.turbopackFileSystemCacheForDev`).
+- Verification evidence: login-page document loads over 15 s fell from 113+ to 1, no `reloadPage` frames; full suite green (`docs/DAILY_LOG.md`, 2026-10-20).
+- Status: Adopted (temporary workaround pending the upstream fix)

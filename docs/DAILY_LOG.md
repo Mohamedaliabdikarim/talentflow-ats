@@ -629,3 +629,32 @@ script exit=0
 **Local app for the activation:** `pnpm dev -p 3000 -H 127.0.0.1` started against the hosted project (`.env.local`), because the link's host is `http://localhost:3000`. Next.js 16 allows one dev server per project directory, so the preview server on port 3100 was stopped first (the preview is reachable at `http://localhost:3000/preview`). Checked: `/api/health` 200, `/login` 200, `/auth/confirm` without a token → 307 to the login page with a generic error, `/auth/set-password` signed out → 307 to login. The owner opens the link from the restricted file privately, sets a password (≥ 10 characters) on `/auth/set-password`, lands on `/admin`, then deletes the file.
 
 **Verified vs pending:** admin account, profile, admin row and audit row verified on the hosted project. Pending (owner): opening the link and setting the password (then `email_confirmed_at`, a password and `last_sign_in_at` appear; verified read-only afterwards, T24 invite → confirm → set password). Not done: hosted Auth settings, deployment, AI integration.
+
+## 2026-10-20 (continued) — Fixed the local login page reload loop (dev-only; no app change)
+
+**Request:** the login/activation page at `http://localhost:3000` kept flashing and showing "Compiling…"; find and fix the root cause, not the symptom; do not weaken auth/RLS; run the checks; do not create another admin, regenerate or open the activation link, or change hosted Auth settings.
+
+**Investigation (no app code changed):**
+
+- Dev server log: the page requested `/login` many times a second, all `200` (no 307 chain, so **no redirect loop**); the auth guards, proxy and login page all behaved correctly (`/login` 200, `/auth/confirm` without a token → 307 `?error=invalid_link`, `/auth/set-password` and `/app` signed out → 307 to login).
+- A fresh headless browser on `/login` recorded **113–122 document loads and 225+ self-navigations in 15 s**. The Turbopack HMR websocket repeatedly sent `{"type":"building"}` then `{"type":"reloadPage","data":"HMR hash mismatch"}`, with `hmrVersion` incrementing each cycle and `built` carrying an empty hash, although every compiled asset was byte-identical between fetches and no source file was changing. Console showed endless `[Fast Refresh] rebuilding`.
+- This matches a known **Next.js 16.4 Turbopack dev regression** (vercel/next.js #100251 and #100267): after a `next dev` restart with a warm dev filesystem cache, the first HMR message is `restart`, which leaves a stale `hmrVersion` and makes the server order a full page reload on every reconnect. 16.3.8 does not loop; the documented workaround is `experimental.turbopackFileSystemCacheForDev: false`. The `.next` directory here also held a production standalone build mixed with the dev cache (from the E2E build), which primed the warm cache.
+
+**Root cause:** a Next.js 16.4.2 Turbopack dev-server HMR bug (empty hash → perpetual `reloadPage`), not TalentFlow code. It affects only `next dev`; the production standalone build is unaffected (the login/auth E2E runs against `pnpm start` and always passed).
+
+**Fix (smallest, dev-only, maintainable):** `next.config.ts` → `experimental.turbopackFileSystemCacheForDev: false`, with a comment citing the issues and noting it is removable once upstream fixes it. Production `next build` uses `turbopackFileSystemCacheForBuild` and is untouched. Cleared the mixed `.next` once so the dev server starts from a clean cache. No change to the proxy, auth guards, RLS, Supabase clients or any route.
+
+**Verification:**
+
+| Check                                                    | Before      | After                                  |
+| -------------------------------------------------------- | ----------- | -------------------------------------- |
+| `/login` document loads in 15 s (fresh headless browser) | 113+        | **1**                                  |
+| self-navigations in 15 s                                 | 225+        | 2 (initial commit; then stable)        |
+| `reloadPage "HMR hash mismatch"` frames                  | every cycle | **none**                               |
+| startup config warning for the flag                      | —           | none (listed under active experiments) |
+
+Routes on the stable server: `/login` 200, `/` 200, `/auth/confirm` (no token) → 307 `?error=invalid_link`, `/auth/set-password` and `/app` signed out → 307 to login. `pnpm lint`, `pnpm typecheck` pass; `pnpm test` 109/109; `pnpm db:verify` 48/48; `pnpm build` succeeds (standalone); E2E `smoke` + `accessibility` + `landing` 24 passed (login reachable/labelled/keyboard-focusable, protected-route redirect with return path, confirm route rejects a missing token, `/app` redirect, login a11y).
+
+**Admin account (read-only check, no secrets):** the hosted admin user is already `email_confirmed`, has a password set, and has one active session (sign-in recorded at 07:18 UTC) — so activation completed earlier despite the flashing. Nothing was changed; the activation link was not regenerated or opened.
+
+**Safe to retry:** the owner can open `http://localhost:3000/login` and sign in with the email and password already set; the page no longer reloads. Reopening the activation link is not needed. Not done: hosted Auth settings, deployment, AI integration.
