@@ -1,13 +1,13 @@
 # TalentFlow ATS — Architecture
 
-**Status:** Phases 1 and 2 implemented locally (auth, guards, provisioning, audit, admin area, jobs, candidates, applications, Kanban with filters). Pointer drag, E2E with real accounts and deployment are Phase 3–5. Nothing is applied to the hosted project or deployed yet.
+**Status (2026-10-22):** Implemented and deployed. Auth, guards, provisioning, audit, admin area, jobs, candidates, applications, Kanban (pointer drag and keyboard moves), CV uploads, AI Candidate Insights with GitHub evidence and membership management are in production. Migrations 0001–0008 are applied to the hosted Supabase project; the application runs on Vercel (ADR-043).
 
 ## 1. System context
 
 ```
 +-------------------+        HTTPS         +------------------------------+
 |  Browser (user)   | <------------------> |  Next.js 16 (App Router)     |
-|  React 19 client  |                      |  Azure App Service (Linux)   |
+|  React 19 client  |                      |  Vercel functions (dub1)     |
 +-------------------+                      |                              |
                                            |  - Server Components (DAL)   |
                                            |  - Server Actions            |
@@ -47,7 +47,7 @@
 1. **User-scoped client** (`@supabase/ssr`, anon key + cookies). Used by Server Components, Server Actions and the browser. RLS enforces tenant isolation. This is the default.
 2. **Service-role client** (server only, `server-only` import guard). Used exclusively for operations that RLS deliberately forbids to end users: creating an organization's first membership, inviting users, granting platform admin, writing certain audit rows. Every such code path first verifies `is_platform_admin()` through the user-scoped client, then performs the privileged write, then records an audit event.
 
-## 3. Application structure (planned)
+## 3. Application structure
 
 ```
 src/
@@ -57,7 +57,7 @@ src/
       page.tsx (overview), organizations/, admins/, audit/
     o/[orgSlug]/                                        tenant workspace (customers and admins)
       page.tsx (overview), jobs/, candidates/, pipeline/, members/, settings/
-    api/health/route.ts                                 Azure health probe
+    api/health/route.ts                                 health probe
   proxy.ts                                              session refresh + optimistic redirects
   components/ui/                                        shadcn/ui primitives
   components/                                           app components (nav, kanban, forms)
@@ -105,4 +105,4 @@ Cache Components (`cacheComponents`) and partial prefetching are disabled (ADR-0
 
 ## 6. Deployment topology
 
-Azure App Service (Linux, Node 22) runs `next start` from the standalone build. Supabase is hosted. Secrets live in App Service application settings. See `docs/DEPLOYMENT.md`.
+Vercel hosts the Next.js app; functions are pinned to `dub1` (Dublin) next to the Supabase project in `eu-west-1` (ADR-042, ADR-043). Secrets live in Vercel environment variables. Azure OpenAI provides the model for Candidate Insights. The standalone build is kept for local production runs and E2E. See `docs/DEPLOYMENT.md`.

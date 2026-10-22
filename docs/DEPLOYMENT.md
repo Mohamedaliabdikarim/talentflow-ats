@@ -1,15 +1,15 @@
 # TalentFlow ATS — Deployment
 
-**Status:** Planned. No cloud resources have been provisioned. Provisioning requires the project owner's approval (paid or account-bound resources).
+**Status (2026-10-22):** Production runs on Vercel at https://talentflow-ats-two.vercel.app (functions in `dub1`, deployed by the Vercel Git integration) with the hosted Supabase project in `eu-west-1` and Azure OpenAI for Candidate Insights (ADR-043). Azure App Service was the original plan and is kept in §4b as a fallback. Paid or account-bound changes still require the owner's approval.
 
 ## 1. Target topology
 
-| Component       | Service                                             | Notes                                                    |
-| --------------- | --------------------------------------------------- | -------------------------------------------------------- |
-| Web app         | Azure App Service, Linux, Node 22 LTS, B1 or higher | Runs `node server.js` from the Next.js standalone output |
-| Database + Auth | Supabase hosted project                             | PostgreSQL 17, Auth with email provider                  |
-| Optional AI     | Azure OpenAI                                        | Only after the core is verified                          |
-| Source + CI     | GitHub (private), GitHub Actions                    | Lint, type-check, unit + DB tests, build on every push   |
+| Component       | Service                                     | Notes                                                  |
+| --------------- | ------------------------------------------- | ------------------------------------------------------ |
+| Web app         | Vercel (Next.js functions pinned to `dub1`) | Git integration deploys every push to `main`           |
+| Database + Auth | Supabase hosted project                     | PostgreSQL 17, Auth with email provider                |
+| AI              | Azure OpenAI                                | Candidate Insights (ADR-034/035)                       |
+| Source + CI     | GitHub (private), GitHub Actions            | Lint, type-check, unit + DB tests, build on every push |
 
 ## 2. Environment variables
 
@@ -29,17 +29,25 @@
 
 **Request-body limits (ADR-041):** CV upload and CV extraction go through Server Actions with `experimental.serverActions.bodySizeLimit = 4400kb` in `next.config.ts`; the application accepts CVs up to 4 MB, under Vercel's 4.5 MB function request cap. Do not raise the body limit above the host's cap. Larger files would need direct-to-Storage uploads.
 
-**Build-time inlining (verified 2026-10-19):** Next.js replaces `process.env.NEXT_PUBLIC_*` with the values present when `next build` runs, in server and client bundles alike. An empty value in `.env.local` is baked in as an empty string and cannot be overridden by App Service settings. Consequences: (1) keep unset `NEXT_PUBLIC_*` lines commented out locally; (2) the GitHub Actions build job must receive the production `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `NEXT_PUBLIC_APP_URL` as repository variables; (3) server-only secrets (`SUPABASE_SERVICE_ROLE_KEY`, AI keys) stay runtime-only in App Service application settings.
+**Build-time inlining (verified 2026-10-19):** Next.js replaces `process.env.NEXT_PUBLIC_*` with the values present when `next build` runs, in server and client bundles alike. An empty value in `.env.local` is baked in as an empty string and cannot be overridden by host settings. Consequences: (1) keep unset `NEXT_PUBLIC_*` lines commented out locally; (2) the GitHub Actions build job must receive the production `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `NEXT_PUBLIC_APP_URL` as repository variables; (3) server-only secrets (`SUPABASE_SERVICE_ROLE_KEY`, AI keys) stay runtime-only in Vercel environment variables (or App Service application settings on the fallback host).
 
 ## 3. Supabase configuration checklist
 
 1. Create project (owner). Record project ref and region.
-2. Authentication → URL configuration: Site URL = `https://<app>.azurewebsites.net`; Redirect URLs include `https://<app>.azurewebsites.net/auth/callback` and `http://localhost:3000/auth/callback`.
+2. Authentication → URL configuration: Site URL = `https://talentflow-ats-two.vercel.app`; Redirect URLs include `https://talentflow-ats-two.vercel.app/auth/callback` and `http://localhost:3000/auth/callback`.
 3. Authentication → Email: enable email provider; disable public sign-ups (users are invited); set minimum password length to 10.
 4. Apply migrations: `pnpm supabase:hosted link`, `list-remote`, `dry-run`, then `push` with explicit approval (`docs/SUPABASE_INTEGRATION.md` §6). Done for migrations 0001–0003 on 2026-10-19.
 5. Create the first platform admin: `pnpm bootstrap:admin --email <demo-admin-email> --name "<name>" --project-ref <ref>` (dry run), then the same with `--apply --link-file <path>` locally with the service-role key in `.env.local` (requires approval; procedure and rollback in `docs/BOOTSTRAP_ADMIN_PLAN.md`). Credentials are shared privately.
 
-## 4. Azure App Service steps (planned)
+## 4. Vercel (production)
+
+1. Import the GitHub repository into Vercel; framework preset Next.js; production branch `main`.
+2. Environment variables = the table in §2 for the Production environment (never set `TALENTFLOW_PREVIEW`; it would expose the synthetic-data preview routes). `NEXT_PUBLIC_APP_URL` = `https://talentflow-ats-two.vercel.app`.
+3. `vercel.json` pins functions to `dub1` (ADR-042); keep it aligned with the Supabase region.
+4. Health check: `/api/health`.
+5. **Candidate Insights runner (ADR-036):** set `INSIGHTS_RUNNER_SECRET` and schedule `POST https://talentflow-ats-two.vercel.app/api/insights/run` with header `x-insights-secret: <secret>` every 2–5 minutes from Vercel Cron or an external HTTP scheduler; the schedule is what makes a queued analysis durable on a serverless host. Whether it is configured in production is an owner-side setting that cannot be verified from this repository.
+
+## 4b. Azure App Service steps (fallback, not provisioned)
 
 1. Resource group, App Service plan (Linux), Web App (Node 22).
 2. Application settings = the environment variables above (never set `TALENTFLOW_PREVIEW`; it would expose the synthetic-data preview routes); `WEBSITES_PORT=3000`; `SCM_DO_BUILD_DURING_DEPLOYMENT=false`.
@@ -50,8 +58,8 @@
 
 ## 5. Rollout and rollback
 
-- Rollout: push to `main` → CI → deploy to the production slot (a staging slot is optional on B1 and above with swap).
-- Rollback: redeploy the previous successful workflow run artifact (GitHub Actions "Re-run" on the earlier commit) or swap slots back. Database migrations are forward-only; a compensating migration is written if needed.
+- Rollout: push to `main` → GitHub Actions CI → the Vercel Git integration builds and promotes the deployment; every other branch gets a preview deployment.
+- Rollback: promote the previous production deployment in the Vercel dashboard or revert the commit. Database migrations are forward-only; a compensating migration is written if needed.
 - Smoke test after deploy: health endpoint, login as demo admin, open an organization, load the pipeline.
 
 ## 6. Local development

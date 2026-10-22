@@ -4,7 +4,7 @@ Read `docs/spec/TALENTFLOW_MASTER_SPEC_V2.md`, this file and the latest entry of
 
 ## Project in one paragraph
 
-Multi-tenant applicant tracking system. Next.js 16 (App Router, React 19, strict TypeScript, Tailwind CSS 4, shadcn/ui on Radix, Motion for React), Supabase (Auth + PostgreSQL + RLS), Azure App Service hosting. Platform admins provision customer organizations and can work inside any customer workspace; customer users manage jobs, candidates and a Kanban pipeline of applications. Tenant isolation is enforced in the database.
+Multi-tenant applicant tracking system. Next.js 16 (App Router, React 19, strict TypeScript, Tailwind CSS 4, shadcn/ui on Radix, Motion for React), Supabase (Auth + PostgreSQL + RLS), Vercel hosting (ADR-043) with Azure OpenAI for AI. Platform admins provision customer organizations and can work inside any customer workspace; customer users manage jobs, candidates and a Kanban pipeline of applications. Tenant isolation is enforced in the database.
 
 ## Product principle (owner, 2026-10-20)
 

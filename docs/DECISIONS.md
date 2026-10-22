@@ -13,7 +13,7 @@ Chronological architecture decision records. Statuses: Proposed | Approved | Imp
 - Security and privacy implications: Server-side rendering keeps secrets on the server; see ADR-006/007.
 - Implementation reference: `package.json`, `next.config.ts`.
 - Verification evidence: Scaffold created with `create-next-app@16.4.2`; baseline checks recorded in `docs/DAILY_LOG.md` (2026-10-19).
-- Status: Approved (mandated) / Implemented (scaffold)
+- Status: Approved (mandated) / Implemented (scaffold); hosting changed to Vercel on 2026-10-21 (ADR-043)
 
 ### ADR-002 — Package manager: pnpm
 
@@ -167,9 +167,9 @@ Chronological architecture decision records. Statuses: Proposed | Approved | Imp
 - Why this approach: Compliance with LinkedIn terms, evidence-based output, protects the core delivery.
 - Trade-offs / risks: Less "wow" factor; honest.
 - Security and privacy implications: No unauthorized data collection; prompt-injection defences described in `docs/AI_FEATURE.md`.
-- Implementation reference: `docs/AI_FEATURE.md`.
-- Verification evidence: n/a until implemented.
-- Status: Approved (design) / Not implemented
+- Implementation reference: `docs/AI_FEATURE.md` (original design); implemented as `docs/AI_INSIGHTS.md` (ADR-035/036/037/038/039).
+- Verification evidence: `docs/TEST_PLAN.md` T36–T44; `docs/DAILY_LOG.md` (2026-10-21, Candidate Insights and GitHub evidence).
+- Status: Implemented (2026-10-21). LinkedIn remains URL-only; GitHub evidence goes through the official REST API with separate authorization (ADR-038); AI output is advisory with attributed evidence and human review.
 
 ### ADR-014 — Kanban interaction: pointer drag plus keyboard "Move to stage" menu, persisted by Server Action
 
@@ -550,3 +550,16 @@ Chronological architecture decision records. Statuses: Proposed | Approved | Imp
 - Implementation reference: `vercel.json`, `src/server/auth.ts`, `src/server/data/workspace.ts`, `src/server/audit.ts`, `src/app/o/[orgSlug]/layout.tsx`, `src/components/page-skeleton.tsx`, `src/app/o/[orgSlug]/loading.tsx`, `src/app/admin/loading.tsx`, `src/app/app/loading.tsx`, the candidate, application and admin-organization pages.
 - Verification evidence: `docs/DAILY_LOG.md` (2026-10-21, navigation performance).
 - Status: Implemented locally; takes effect on the next deployment (region pin requires a redeploy)
+
+### ADR-043 — Production hosting moved from Azure App Service to Vercel
+
+- Date: 2026-10-22 (records a change made on 2026-10-21)
+- Context / problem: The spec and the early documents (A10, `docs/DEPLOYMENT.md`, `docs/ARCHITECTURE.md` §6) planned Azure App Service for the Next.js app. Azure provisioning was deferred by the owner on 2026-10-19 and never carried out. When the first production deployment was needed (2026-10-21), the owner connected the GitHub repository to Vercel, which builds and deploys every push to `main` without a custom pipeline. ADR-041 and ADR-042 already assume this host (request-body cap, `dub1` function region).
+- Decision: Production runs on Vercel: Next.js functions pinned to `dub1` (Dublin) by `vercel.json`, deployed through the Vercel Git integration, environment variables held in Vercel project settings. Supabase (Auth, PostgreSQL, Storage) stays in `eu-west-1`. Azure is used only for Azure OpenAI (ADR-034). The public URL is https://talentflow-ats-two.vercel.app. The standalone build (`output: "standalone"`) is kept so the application can still run on any Node host; `pnpm start` and the Playwright suite continue to exercise it.
+- Options considered: (a) Azure App Service as planned — rejected for now: it needs an App Service plan, a publish profile, a GitHub Actions deploy job and a WebJob for the insights schedule before anything is reachable, with no delivery-time benefit; (b) Vercel — chosen: zero-config Next.js hosting, preview deployments per push, an EU function region; (c) a container on Azure Container Apps — rejected: more moving parts than either option.
+- Why this approach: shortest path to a verifiable public URL before the 2026-10-26 deadline, with the database and the functions in the same region.
+- Trade-offs / risks: functions are serverless, not an always-on Node process: the Candidate Insights `after()` kick still works, but durability needs a scheduled call to `POST /api/insights/run` (Vercel Cron or an external scheduler) instead of an App Service WebJob (ADR-036, `docs/DEPLOYMENT.md` §4); the 4.5 MB request cap bounds CV uploads (ADR-041); cold starts of about one second on the first request after idle; a move back to Azure App Service stays possible because the standalone build is unchanged.
+- Security and privacy implications: secrets move from Azure application settings to Vercel environment variables (server-only values never reach the client bundle; the CI grep for the service-role key name is unchanged); the Supabase Auth Site URL and redirect list must name the Vercel domain; the data path (browser → Vercel function in Dublin → Supabase in Ireland) stays inside the EU; Azure OpenAI retention is unchanged (`docs/AI_INSIGHTS.md` §2).
+- Implementation reference: `vercel.json`; `next.config.ts` (`serverActions.bodySizeLimit`); `docs/DEPLOYMENT.md`; `docs/ARCHITECTURE.md` §1 and §6; `docs/ASSUMPTIONS.md` A10.
+- Verification evidence: production responses carry `X-Vercel-Id` and `/api/health` and `/login` were measured on the public URL (`docs/DAILY_LOG.md`, 2026-10-21, navigation performance).
+- Status: Implemented (production is live on Vercel)

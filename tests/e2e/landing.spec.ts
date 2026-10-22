@@ -19,9 +19,7 @@ test("hero headline, honest copy and sign-in CTAs", async ({ page }) => {
     "href",
     "#product",
   );
-  await expect(
-    page.getByRole("heading", { name: "Evidence first. Humans decide." }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Evidence first. Humans decide." })).toBeVisible();
 });
 
 test("navigation links reach every section and the app entry", async ({ page }) => {

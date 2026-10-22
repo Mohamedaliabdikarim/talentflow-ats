@@ -54,7 +54,7 @@ Privileged operations and their guard:
 ## 5. Secrets and configuration
 
 - `.env.local` for local development (git-ignored). `.env.example` documents variable names only.
-- Production secrets in Azure App Service application settings; never in the repository or build logs.
+- Production secrets in Vercel environment variables (ADR-043); never in the repository or build logs.
 - `src/lib/env.ts` validates variables at startup with Zod and separates public (`NEXT_PUBLIC_*`) from server-only names.
 - Demo credentials are shared through a private channel, never in README, commits or the video.
 

@@ -128,8 +128,8 @@ unit is the **`pending` row**. Processing is driven by an authenticated internal
 `INSIGHTS_RUNNER_SECRET`):
 
 - The enqueue path uses `after()` to kick the endpoint for an immediate, low-latency run on the
-  always-on Node server (Azure App Service, `output: "standalone"`).
-- **Durability** comes from a scheduled call to the same endpoint (Azure App Service cron/WebJob or an
+  host (originally planned as an always-on Azure App Service; production is Vercel, ADR-043).
+- **Durability** comes from a scheduled call to the same endpoint (Vercel Cron, an App Service WebJob or an
   external scheduler) that drains any `pending`/stuck rows, plus an authorized manual **Retry** in the
   UI. If the `after()` kick is lost, the row is still `pending` and gets picked up.
 - If `INSIGHTS_RUNNER_SECRET` is unset, the kick is skipped and the row waits for a manual/scheduled
