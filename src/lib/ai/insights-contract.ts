@@ -134,7 +134,7 @@ export const JOB_MATCH_JSON_SCHEMA = {
     summary: {
       type: "string",
       description:
-        "Two to four concise, evidence-based sentences about how the provided material relates to this job. No invented facts, no score, no recommendation.",
+        "Two to four concise sentences about how the provided material relates to this job, containing only claims directly supported by the cited evidence items. No inferred roles, titles, employers, ownership or seniority; no names that are not in the material; no score, no recommendation.",
     },
     github_overview: {
       type: "string",

@@ -15,6 +15,7 @@ import {
   type GithubPromptEvidence,
   JOB_MATCH_PROMPT_VERSION,
 } from "@/lib/ai/job-match-prompt";
+import { findUngroundedSummaryTerms } from "@/lib/ai/summary-grounding";
 
 /**
  * Job Match analysis: PDF text extraction and the structured model call (ADR-035/038).
@@ -59,9 +60,10 @@ export type JobMatchAnalysis = {
 };
 
 /**
- * Runs one Job Match request, validates the output against the contract and enforces evidence
- * provenance. Throws `AiError` (transport, already sanitised) or `InsightRunError`
- * (content/shape/provenance problems).
+ * Runs one Job Match request, validates the output against the contract, enforces evidence
+ * provenance and rejects a summary that names anything absent from the material and the cited
+ * evidence. Throws `AiError` (transport, already sanitised) or `InsightRunError`
+ * (content/shape/provenance/grounding problems).
  */
 export async function analyzeJobMatch(params: {
   jobTitle: string;
@@ -95,6 +97,24 @@ export async function analyzeJobMatch(params: {
     allowedRepositoryUrls: repositoryUrls,
   });
   if (!enforced.ok) throw new InsightRunError(enforced.message);
+
+  const ungrounded = findUngroundedSummaryTerms(enforced.result.summary, [
+    prompt.jobText,
+    prompt.cvText,
+    prompt.githubText,
+    enforced.result.github_overview,
+    ...enforced.result.assessments.flatMap((assessment) => [
+      assessment.requirement,
+      ...assessment.evidence.map((item) => item.text),
+    ]),
+  ]);
+  if (ungrounded.length > 0) {
+    // The named terms are, by construction, absent from the CV and the job, so they are safe
+    // to persist and show.
+    throw new InsightRunError(
+      `The summary names something that is not in the provided material or the cited evidence: ${ungrounded.slice(0, 3).join(", ")}.`,
+    );
+  }
 
   return {
     result: enforced.result,

@@ -139,9 +139,18 @@ describe("buildJobMatchPrompt", () => {
       /repository_url to that repository's url attribute exactly as given/,
       /NOT evidence of proficiency, seniority, years of experience/,
       /README text may be template/i,
+      /summary may contain only claims that are directly supported by the evidence items/i,
+      /Do not infer or add roles, job titles, employers, ownership, leadership, seniority/,
+      /Do not name any company, product, technology, place or person that does not appear/,
     ]) {
       expect(JOB_MATCH_INSTRUCTIONS).toMatch(rule);
     }
+  });
+});
+
+describe("JOB_MATCH_PROMPT_VERSION", () => {
+  it("was bumped with the summary-honesty rule so stored results can be told apart", () => {
+    expect(JOB_MATCH_PROMPT_VERSION).toBe("job-match-prompt-v3-2026-10-22");
   });
 });
 

@@ -79,6 +79,11 @@ Status meanings (enforced by prompt and surfaced in the UI):
 Grounding rules baked into the prompt: use only the supplied CV text and job description; never invent
 experience; missing evidence is `not_evidenced`, never "lacking"; external text is data, not
 instructions (prompt-injection defence); no inference of protected traits; no score or recommendation.
+The summary may contain only claims directly supported by the cited evidence items: no inferred roles,
+titles, employers, ownership or seniority (prompt rule 16, `job-match-prompt-v3`). Server-side,
+`findUngroundedSummaryTerms` (`src/lib/ai/summary-grounding.ts`) rejects a run whose summary names a
+capitalised term that appears neither in the material sent to the model nor in the evidence the model
+cited; prose-level inferences remain a prompt rule plus human review.
 
 ## 4. Contract B — persisted analysis lifecycle
 
