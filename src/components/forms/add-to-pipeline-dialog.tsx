@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus } from "lucide-react";
+import Link from "next/link";
 import { useActionState, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,14 @@ type AddToPipelineDialogProps = {
   /** The side that is already known (the job on a job page, the candidate on a candidate page). */
   fixed: { name: "jobId" | "candidateId"; value: string };
   /** The side the user picks. Options exclude existing applications. */
-  choose: { name: "jobId" | "candidateId"; label: string; options: Option[]; emptyText: string };
+  choose: {
+    name: "jobId" | "candidateId";
+    label: string;
+    options: Option[];
+    emptyText: string;
+    /** Where to go when there is nothing to pick, e.g. create a candidate for this job. */
+    emptyAction?: { href: string; label: string };
+  };
   triggerLabel: string;
   title: string;
   description: string;
@@ -75,7 +83,16 @@ export function AddToPipelineDialog({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         {choose.options.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{choose.emptyText}</p>
+          <>
+            <p className="text-sm text-muted-foreground">{choose.emptyText}</p>
+            {choose.emptyAction ? (
+              <DialogFooter>
+                <Button asChild>
+                  <Link href={choose.emptyAction.href}>{choose.emptyAction.label}</Link>
+                </Button>
+              </DialogFooter>
+            ) : null}
+          </>
         ) : (
           <AddForm
             key={formKey}

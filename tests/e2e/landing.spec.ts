@@ -51,6 +51,19 @@ test("product showcase renders the real board but is inert", async ({ page }) =>
   expect(activeInside).toBe(false);
 });
 
+for (const width of [320, 360]) {
+  test(`no horizontal overflow at ${width} px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/");
+    await revealAll(page);
+    const [scrollWidth, clientWidth] = await page.evaluate(() => [
+      document.documentElement.scrollWidth,
+      document.documentElement.clientWidth,
+    ]);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+  });
+}
+
 test("the app entry point sends signed-out visitors to login", async ({ page }) => {
   await page.goto("/app");
   await expect(page).toHaveURL(/\/login\?next=%2Fapp$/);

@@ -149,7 +149,7 @@ function Feature({
       <div
         className={cn(
           CONTAINER,
-          "grid items-center gap-10 lg:grid-cols-2 lg:gap-16",
+          "grid items-center gap-10 lg:grid-cols-2 lg:gap-16 [&>*]:min-w-0",
           reverse && "lg:[&>*:first-child]:order-2",
         )}
       >

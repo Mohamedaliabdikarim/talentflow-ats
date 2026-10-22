@@ -47,6 +47,10 @@ export default async function JobDetailPage({
               options: candidateOptions,
               emptyText:
                 "Every candidate in this workspace is already in this pipeline, or there are no candidates yet.",
+              emptyAction: {
+                href: `/o/${orgSlug}/candidates/new?job=${job.id}`,
+                label: "Create new candidate",
+              },
             }}
             triggerLabel="Add candidate"
             title={`Add a candidate to ${job.title}`}
