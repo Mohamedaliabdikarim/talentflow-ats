@@ -34,16 +34,16 @@ test("jobs table links to a job detail with its applications", async ({ page }) 
   await page.getByRole("link", { name: BACKEND_JOB }).click();
   await expect(page.getByRole("heading", { name: BACKEND_JOB })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
-  await expect(page.getByRole("table")).toContainText("Ada Example");
+  await expect(page.getByRole("table")).toContainText("Ada Lindqvist");
 });
 
 test("candidate search filters by name and detail shows safe profile links", async ({ page }) => {
   await page.goto(`${BASE}/candidates?q=ada`);
   const table = page.getByRole("table");
-  await expect(table).toContainText("Ada Example");
-  await expect(table).not.toContainText("Bjørn Demo");
-  await page.getByRole("link", { name: "Ada Example" }).click();
-  await expect(page.getByRole("heading", { name: "Ada Example" })).toBeVisible();
+  await expect(table).toContainText("Ada Lindqvist");
+  await expect(table).not.toContainText("Bjørn Haugen");
+  await page.getByRole("link", { name: "Ada Lindqvist" }).click();
+  await expect(page.getByRole("heading", { name: "Ada Lindqvist" })).toBeVisible();
   const linkedin = page.getByRole("link", { name: /Profile provided/ });
   await expect(linkedin).toHaveAttribute("rel", "noopener noreferrer");
   await expect(linkedin).toHaveAttribute("target", "_blank");
@@ -60,7 +60,7 @@ test("pipeline shows six stages, combines job and name filters, and persists a m
     name: /^(New|Screening|Interview|Offer|Hired|Rejected)$/,
   });
   await expect(columns).toHaveCount(6);
-  await expect(page.getByRole("listitem", { name: "Interview" })).toContainText("Ada Example");
+  await expect(page.getByRole("listitem", { name: "Interview" })).toContainText("Ada Lindqvist");
 
   // Job filter through the real form.
   await page.getByRole("combobox", { name: "Job" }).click();
@@ -69,28 +69,28 @@ test("pipeline shows six stages, combines job and name filters, and persists a m
   await expect(page).toHaveURL(/pipeline\?job=/);
   await expect(page.getByRole("heading", { name: "Pipeline" })).toBeVisible();
   await expect(page.getByText(`Applications for ${BACKEND_JOB}`)).toBeVisible();
-  await expect(page.getByRole("listitem", { name: "Interview" })).not.toContainText("Chidi Sample");
+  await expect(page.getByRole("listitem", { name: "Interview" })).not.toContainText("Chidi Okafor");
 
   // Name filter combined with the job filter.
   await page.getByLabel("Candidate name").fill("ada");
   await page.getByRole("button", { name: "Apply filters" }).click();
   await expect(page).toHaveURL(/q=ada/);
-  await expect(page.getByRole("listitem", { name: "Interview" })).toContainText("Ada Example");
-  await expect(page.getByRole("listitem", { name: "Screening" })).not.toContainText("Bjørn Demo");
+  await expect(page.getByRole("listitem", { name: "Interview" })).toContainText("Ada Lindqvist");
+  await expect(page.getByRole("listitem", { name: "Screening" })).not.toContainText("Bjørn Haugen");
 
   // Move by the keyboard-accessible menu; the change is announced and survives a reload.
-  await page.getByRole("button", { name: "Move Ada Example to another stage" }).click();
+  await page.getByRole("button", { name: "Move Ada Lindqvist to another stage" }).click();
   await page.getByRole("menuitem", { name: "Offer" }).click();
   // Announced twice by design: the sr-only live region and the toast.
-  await expect(page.getByText("Moved Ada Example to Offer").first()).toBeVisible();
-  await expect(page.getByRole("listitem", { name: "Offer" })).toContainText("Ada Example");
+  await expect(page.getByText("Moved Ada Lindqvist to Offer").first()).toBeVisible();
+  await expect(page.getByRole("listitem", { name: "Offer" })).toContainText("Ada Lindqvist");
   await page.reload();
-  await expect(page.getByRole("listitem", { name: "Offer" })).toContainText("Ada Example");
+  await expect(page.getByRole("listitem", { name: "Offer" })).toContainText("Ada Lindqvist");
 
   // Reset restores the data set.
   await page.getByRole("button", { name: "Reset demo data" }).click();
   await page.goto(`${BASE}/pipeline?job=${new URL(page.url()).searchParams.get("job")}&q=ada`);
-  await expect(page.getByRole("listitem", { name: "Interview" })).toContainText("Ada Example");
+  await expect(page.getByRole("listitem", { name: "Interview" })).toContainText("Ada Lindqvist");
 });
 
 test("empty filter result shows an explanatory empty state", async ({ page }) => {

@@ -31,7 +31,7 @@ describe("preview store", () => {
     expect(byName.every((card) => card.candidateName.toLowerCase().includes("ada"))).toBe(true);
     const both = previewCards({ jobId: backend, q: "ADA" });
     expect(both).toHaveLength(1);
-    expect(both[0]).toMatchObject({ jobId: backend, candidateName: "Ada Example" });
+    expect(both[0]).toMatchObject({ jobId: backend, candidateName: "Ada Lindqvist" });
   });
 
   it("moves an application, bumps its stage timestamp, and resets", () => {
@@ -52,8 +52,8 @@ describe("preview store", () => {
     expect(jobs.reduce((sum, job) => sum + job.application_count, 0)).toBe(
       PREVIEW_APPLICATIONS.length,
     );
-    expect(previewCandidates("dummy").map((candidate) => candidate.full_name)).toEqual([
-      "Jonas Dummy",
+    expect(previewCandidates("eriksen").map((candidate) => candidate.full_name)).toEqual([
+      "Jonas Eriksen",
     ]);
     expect(previewCandidates("zzz")).toEqual([]);
   });

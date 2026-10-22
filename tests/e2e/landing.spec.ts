@@ -19,7 +19,9 @@ test("hero headline, honest copy and sign-in CTAs", async ({ page }) => {
     "href",
     "#product",
   );
-  await expect(page.getByText("In development").first()).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Evidence first. Humans decide." }),
+  ).toBeVisible();
 });
 
 test("navigation links reach every section and the app entry", async ({ page }) => {
@@ -40,7 +42,7 @@ test("product showcase renders the real board but is inert", async ({ page }) =>
   await page.goto("/");
   const showcase = page.locator("[inert]").first();
   await expect(showcase).toContainText("Pipeline");
-  await expect(showcase).toContainText("Ada Example");
+  await expect(showcase).toContainText("Ada Lindqvist");
   // Nothing inside the showcase can take focus.
   const focusable = await showcase.locator("a, button, input, select, textarea").count();
   expect(focusable).toBeGreaterThan(0);

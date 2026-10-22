@@ -232,7 +232,7 @@ function CandidatesVisual() {
     <Frame aria-hidden="true">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-base font-semibold">Ada Example</p>
+          <p className="text-base font-semibold">Ada Lindqvist</p>
           <p className="text-sm text-muted-foreground">
             Senior backend engineer, Go and TypeScript
           </p>
@@ -352,18 +352,18 @@ const AI_GROUPS: Array<{ label: string; tone: string; items: string[] }> = [
     tone: "border-emerald-400/30 text-emerald-200",
     items: [
       "Five years of Go services, cited from the CV",
-      "Maintains an open-source PostgreSQL tool",
+      "Maintains a public PostgreSQL tool, cited from GitHub",
     ],
   },
   {
-    label: "Uncertain",
+    label: "Needs verification",
     tone: "border-amber-400/30 text-amber-200",
     items: ["Team leadership: mentioned without scope"],
   },
   {
-    label: "Not provided",
+    label: "Not evidenced",
     tone: "border-white/15 text-muted-foreground",
-    items: ["Experience with Azure"],
+    items: ["Experience with Azure: not in the provided material"],
   },
 ];
 
@@ -378,22 +378,21 @@ export function AiSection() {
           <p className="inline-flex items-center gap-2 text-sm font-medium text-primary">
             <Sparkles className="size-4" aria-hidden="true" />
             AI Candidate Insights
-            <Badge variant="outline" className="border-white/20 text-foreground/80">
-              In development
-            </Badge>
           </p>
           <h2 className="mt-3 text-3xl font-semibold tracking-[-0.025em] text-balance sm:text-4xl">
             Evidence first. Humans decide.
           </h2>
           <p className="mt-4 text-lg text-pretty text-muted-foreground">
-            We are building an advisory summary that compares what a candidate actually provided
-            with what a job asks for. It is not available yet, and this is how it will work.
+            When an application reaches screening, TalentFlow compares what the candidate actually
+            provided with what the job asks for and writes an advisory summary for the reviewer.
+            Every finding is tied to its source.
           </p>
           <ul className="mt-6 space-y-3 text-sm text-foreground/90">
             {[
-              "Every finding cites its source: CV text, a public GitHub repository, or the profile",
-              "Findings are grouped as supported, uncertain, or not provided",
-              "No ranking, no scoring, no automatic rejection; a reviewer confirms or deletes it",
+              "Each requirement is marked supported, needs verification, or not evidenced, with the evidence quoted from the CV or a public GitHub repository",
+              "Not evidenced means the material does not show it, never that the candidate lacks it",
+              "No score, no ranking, no automatic rejection: a person reads the summary and decides",
+              "Runs only with explicit, recorded authorization per candidate; revoking it deletes the derived insights",
               "Public GitHub data only through the official API; LinkedIn is never scraped",
             ].map((item) => (
               <li key={item} className="flex items-start gap-3">
@@ -405,17 +404,13 @@ export function AiSection() {
               </li>
             ))}
           </ul>
-          <p className="mt-6 text-sm text-muted-foreground">
-            Shown as a design illustration. The feature ships only after the core product is
-            verified.
-          </p>
         </Reveal>
         <Reveal delay={0.1}>
           <Frame aria-hidden="true">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <p className="text-sm font-semibold">Insights for Senior Backend Engineer</p>
-              <span className="rounded-md border border-dashed border-white/20 px-2 py-1 text-xs text-muted-foreground">
-                Illustration
+              <span className="rounded-md border border-white/20 px-2 py-1 text-xs text-muted-foreground">
+                AI · advisory
               </span>
             </div>
             <div className="mt-4 space-y-4">
@@ -548,7 +543,7 @@ export function LandingFooter() {
         )}
       >
         <p>© 2026 TalentFlow. All rights reserved.</p>
-        <p>AI Candidate Insights is in development and not yet available.</p>
+        <p>AI Candidate Insights is advisory and never decides for you.</p>
       </div>
     </footer>
   );

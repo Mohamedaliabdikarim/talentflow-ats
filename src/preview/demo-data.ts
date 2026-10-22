@@ -137,7 +137,7 @@ export const PREVIEW_CANDIDATES: DemoCandidate[] = [
   candidate(
     1,
     {
-      full_name: "Ada Example",
+      full_name: "Ada Lindqvist",
       headline: "Senior backend engineer, Go and TypeScript",
       email: "ada@example.test",
       location: "Oslo",
@@ -150,7 +150,7 @@ export const PREVIEW_CANDIDATES: DemoCandidate[] = [
   candidate(
     2,
     {
-      full_name: "Bjørn Demo",
+      full_name: "Bjørn Haugen",
       headline: "Platform engineer, PostgreSQL specialist",
       email: "bjorn@example.test",
       location: "Trondheim",
@@ -161,7 +161,7 @@ export const PREVIEW_CANDIDATES: DemoCandidate[] = [
   candidate(
     3,
     {
-      full_name: "Chidi Sample",
+      full_name: "Chidi Okafor",
       headline: "Product designer, B2B SaaS",
       email: "chidi@example.test",
       location: "Berlin",
@@ -172,7 +172,7 @@ export const PREVIEW_CANDIDATES: DemoCandidate[] = [
   candidate(
     4,
     {
-      full_name: "Dana Placeholder",
+      full_name: "Dana Whitfield",
       headline: "UX researcher turned product designer",
       email: "dana@example.test",
       location: "Remote",
@@ -184,7 +184,7 @@ export const PREVIEW_CANDIDATES: DemoCandidate[] = [
   candidate(
     5,
     {
-      full_name: "Elif Test",
+      full_name: "Elif Kaya",
       headline: "Customer success lead, fintech",
       email: "elif@example.test",
       location: "Bergen",
@@ -195,7 +195,7 @@ export const PREVIEW_CANDIDATES: DemoCandidate[] = [
   candidate(
     6,
     {
-      full_name: "Farid Mock",
+      full_name: "Farid Rahimi",
       headline: "Account manager",
       email: "farid@example.test",
       location: "Stavanger",
@@ -205,7 +205,7 @@ export const PREVIEW_CANDIDATES: DemoCandidate[] = [
   candidate(
     7,
     {
-      full_name: "Grete Fixture",
+      full_name: "Grete Solberg",
       headline: "Backend developer, Kotlin",
       email: "grete@example.test",
       location: "Oslo",
@@ -216,7 +216,7 @@ export const PREVIEW_CANDIDATES: DemoCandidate[] = [
   candidate(
     8,
     {
-      full_name: "Hiro Specimen",
+      full_name: "Hiro Tanaka",
       headline: "Full-stack engineer",
       email: "hiro@example.test",
       location: "Copenhagen",
@@ -228,7 +228,7 @@ export const PREVIEW_CANDIDATES: DemoCandidate[] = [
   candidate(
     9,
     {
-      full_name: "Ingrid Stub",
+      full_name: "Ingrid Berg",
       headline: "Data analyst, SQL and dbt",
       email: "ingrid@example.test",
       location: "Oslo",
@@ -238,7 +238,7 @@ export const PREVIEW_CANDIDATES: DemoCandidate[] = [
   candidate(
     10,
     {
-      full_name: "Jonas Dummy",
+      full_name: "Jonas Eriksen",
       headline: "Engineering manager",
       email: "jonas@example.test",
       location: "Oslo",
@@ -298,7 +298,7 @@ export const PREVIEW_MEMBERS = [
     membershipId: "00000000-0000-4000-8000-0000000003a2",
     userId: "00000000-0000-4000-8000-00000000b002",
     email: "recruiter@example.test",
-    fullName: "Rita Recruiter",
+    fullName: "Rita Nygaard",
     role: "member" as const,
     status: "active" as const,
     createdAt: at(14),

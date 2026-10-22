@@ -29,7 +29,7 @@ const PAGES = [
   {
     slug: "candidate-detail",
     path: "/preview/o/northwind/candidates/00000000-0000-4000-8000-000000000101",
-    heading: "Ada Example",
+    heading: "Ada Lindqvist",
   },
   { slug: "pipeline", path: "/preview/o/northwind/pipeline", heading: "Pipeline" },
   { slug: "admin-overview", path: "/preview/admin", heading: "Overview" },
