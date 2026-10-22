@@ -52,8 +52,5 @@ export function StatCard({ label, value }: { label: string; value: number | stri
   );
 }
 
-export function formatDateTime(value: string): string {
-  return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(
-    new Date(value),
-  );
-}
+/** Re-exported so every view keeps one import path; the formatter itself lives in src/lib. */
+export { formatDateTime } from "@/lib/format-date";
