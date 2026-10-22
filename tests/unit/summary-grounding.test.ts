@@ -55,4 +55,45 @@ describe("findUngroundedSummaryTerms", () => {
     expect(findUngroundedSummaryTerms("", corpus)).toEqual([]);
     expect(findUngroundedSummaryTerms("nothing named here", [])).toEqual([]);
   });
+
+  describe("legitimate paraphrases a reviewer reported as false positives (2026-10-22)", () => {
+    const material = [
+      "Fullstack Developer\n\nTypeScript, React and Postgres. Experience with Azure is a plus.",
+      "Jan 2021 - present: Backend developer at Fjord Logistics. BSc Computer Science (2018). CI/CD on GitHub Actions.",
+      "Lists TypeScript on two recent roles.",
+    ];
+
+    it("accepts a hyphenated compound whose joined form is in the material (Full-stack / Fullstack)", () => {
+      expect(
+        findUngroundedSummaryTerms("The CV shows Full-stack work at Fjord Logistics.", material),
+      ).toEqual([]);
+    });
+
+    it("accepts calendar names and degree levels written out from abbreviations", () => {
+      expect(
+        findUngroundedSummaryTerms(
+          "Employed since January 2021; the CV lists a Bachelor's degree. Started on a Monday in Sept.",
+          material,
+        ),
+      ).toEqual([]);
+    });
+
+    it("treats a word after a closing quote or bracket at a sentence end as sentence-initial", () => {
+      expect(
+        findUngroundedSummaryTerms(
+          'Azure is "not evidenced". Cloud work is unclear (see the CV). Further detail is missing.',
+          material,
+        ),
+      ).toEqual([]);
+    });
+
+    it("still rejects invented employers, job titles, credentials and places", () => {
+      expect(
+        findUngroundedSummaryTerms(
+          "The candidate was Head of Platform at Acme Corp in Trondheim and holds an MBA.",
+          material,
+        ),
+      ).toEqual(["Head", "Platform", "Acme", "Corp", "Trondheim", "MBA"]);
+    });
+  });
 });

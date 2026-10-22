@@ -83,7 +83,11 @@ The summary may contain only claims directly supported by the cited evidence ite
 titles, employers, ownership or seniority (prompt rule 16, `job-match-prompt-v3`). Server-side,
 `findUngroundedSummaryTerms` (`src/lib/ai/summary-grounding.ts`) rejects a run whose summary names a
 capitalised term that appears neither in the material sent to the model nor in the evidence the model
-cited; prose-level inferences remain a prompt rule plus human review.
+cited; prose-level inferences remain a prompt rule plus human review. The gate ignores
+sentence-initial words (also after a closing quote or bracket), calendar names and degree levels
+("January" for "Jan", "Bachelor's" for "BSc"), and accepts a hyphenated compound whose joined form
+is in the material ("Full-stack" for "Fullstack"); employers, titles, places, technologies and
+credentials such as PhD or MBA stay subject to the check (2026-10-22 review fix).
 
 ## 4. Contract B — persisted analysis lifecycle
 

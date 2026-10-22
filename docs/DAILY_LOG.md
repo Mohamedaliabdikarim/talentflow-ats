@@ -1251,3 +1251,15 @@ Six items from the owner's review, one commit each, `pnpm check` after every one
 `pnpm test:e2e` against the final standalone build: **49 passed, 0 failed, 55 skipped** (authenticated scenarios), chromium + mobile, including the two new overflow tests and the renamed preview names.
 
 **Not verified:** the live pages on Vercel (needs a push and the owner's session); the summary-grounding gate against a real model response (unit tests only; a production run that now fails with "The summary names something…" can be retried from the panel). Committed locally only; not pushed.
+
+## 2026-10-22 (continued) — Summary-grounding gate: false positives on legitimate paraphrases
+
+**Report:** the gate in `analyzeJobMatch` rejected a legitimate summary. The owner's message did not include the term, so the gate was probed with legitimate summaries against a realistic corpus; three classes of false positive reproduced: (1) a hyphenated compound whose joined form is in the material ("Full-stack" vs the job title "Fullstack Developer"); (2) a calendar name or degree level written out from an abbreviation ("January" vs "Jan 2021", "Bachelor's" vs "BSc"; the prefix rule needs four letters, so "jan" did not ground "january"); (3) a capitalised word after a closing quote or bracket at a sentence end (`"not evidenced". Cloud …`), which the sentence-start rule did not recognise.
+
+**Fix (`src/lib/ai/summary-grounding.ts`, smallest change that keeps employers and titles rejected):** the sentence-end pattern tolerates closing quotes and brackets; month and day names, their abbreviations and the degree levels bachelor/master are allowed words; a term containing a space after normalisation (hyphen or dot compound) is also grounded when its joined form occurs in the joined corpus. Job titles, seniority words, employers, places, technologies and credentials such as PhD or MBA are unchanged and still fail.
+
+**Tests:** `tests/unit/summary-grounding.test.ts` adds four cases (the three paraphrases accepted; "Head of Platform at Acme Corp in Trondheim … holds an MBA" still returns all six terms); `tests/unit/job-match-analyze.test.ts` unchanged and green.
+
+**How to read the error:** the persisted failure message is `The summary names something that is not in the provided material or the cited evidence: <term>[, <term>, <term>].` The listed terms are the first three capitalised words the gate could not find in the job title, job description, CV text, GitHub block, GitHub overview, requirement names or evidence texts. Retry from the panel re-runs the analysis with the corrected gate.
+
+**Commands and results (this machine):** `pnpm lint` 0 errors (7 pre-existing warnings); `pnpm typecheck` pass; `pnpm test` 44 files, **392/392**; `pnpm db:verify` 9 files, **90/90**; `pnpm build` pass. Committed locally only; not pushed.
