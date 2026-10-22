@@ -1,25 +1,34 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { ConfirmActionDialog } from "@/components/confirm-action-dialog";
 import { AddToPipelineDialog } from "@/components/forms/add-to-pipeline-dialog";
 import { PermissionDenied } from "@/components/permission-denied";
 import { JobDetailView } from "@/components/views/job-detail";
+import { isUuid } from "@/lib/validation/id";
 import { deleteJobAction } from "@/server/actions/jobs";
 import { getOrganizationContext } from "@/server/auth";
 import { listCandidateOptions } from "@/server/data/candidates";
 import { getJob, listJobApplications } from "@/server/data/jobs";
 
-export const metadata: Metadata = { title: "Job" };
+type Params = Promise<{ orgSlug: string; jobId: string }>;
 
-export default async function JobDetailPage({
-  params,
-}: {
-  params: Promise<{ orgSlug: string; jobId: string }>;
-}) {
+/** One job read per request, shared by the page title and the page body. */
+const loadJob = cache(getJob);
+
+export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+  const { orgSlug, jobId } = await params;
+  const organization = await getOrganizationContext(orgSlug);
+  const job = organization && isUuid(jobId) ? await loadJob(organization.id, jobId) : null;
+  return { title: job?.title ?? "Job" };
+}
+
+export default async function JobDetailPage({ params }: { params: Params }) {
   const { orgSlug, jobId } = await params;
   const organization = await getOrganizationContext(orgSlug);
   if (!organization) return <PermissionDenied />;
-  const job = await getJob(organization.id, jobId);
+  if (!isUuid(jobId)) notFound();
+  const job = await loadJob(organization.id, jobId);
   if (!job) notFound();
 
   const [applications, candidates] = await Promise.all([

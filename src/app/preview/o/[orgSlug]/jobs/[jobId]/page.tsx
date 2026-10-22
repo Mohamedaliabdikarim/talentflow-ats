@@ -6,13 +6,15 @@ import { JobDetailView } from "@/components/views/job-detail";
 import { PREVIEW_BASE } from "@/preview/enabled";
 import { previewJob, previewJobApplications } from "@/preview/store";
 
-export const metadata: Metadata = { title: "Job (preview)" };
+type Params = Promise<{ jobId: string }>;
 
-export default async function PreviewJobDetailPage({
-  params,
-}: {
-  params: Promise<{ jobId: string }>;
-}) {
+export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+  const { jobId } = await params;
+  const job = previewJob(jobId);
+  return { title: job ? `${job.title} (preview)` : "Job (preview)" };
+}
+
+export default async function PreviewJobDetailPage({ params }: { params: Params }) {
   const { jobId } = await params;
   const job = previewJob(jobId);
   if (!job) notFound();

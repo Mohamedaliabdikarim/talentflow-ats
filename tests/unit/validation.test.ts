@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isUuid } from "@/lib/validation/id";
 import {
   APPLICATION_STAGES,
   applicationStageSchema,
@@ -173,5 +174,14 @@ describe("auth helpers", () => {
     [42, "/"],
   ])("safeRedirectPath(%j) -> %j", (input, expected) => {
     expect(safeRedirectPath(input)).toBe(expected);
+  });
+});
+
+describe("isUuid (route id guard)", () => {
+  it("accepts UUIDs and rejects anything PostgreSQL would refuse, so pages answer 404 not 500", () => {
+    expect(isUuid("00000000-0000-4000-8000-000000000001")).toBe(true);
+    expect(isUuid("not-a-uuid")).toBe(false);
+    expect(isUuid("")).toBe(false);
+    expect(isUuid("00000000-0000-4000-8000-00000000000")).toBe(false);
   });
 });

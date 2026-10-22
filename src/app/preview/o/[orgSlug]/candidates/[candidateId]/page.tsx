@@ -6,13 +6,15 @@ import { CandidateDetailView } from "@/components/views/candidate-detail";
 import { PREVIEW_BASE } from "@/preview/enabled";
 import { previewCandidate, previewCandidateApplications } from "@/preview/store";
 
-export const metadata: Metadata = { title: "Candidate (preview)" };
+type Params = Promise<{ candidateId: string }>;
 
-export default async function PreviewCandidateDetailPage({
-  params,
-}: {
-  params: Promise<{ candidateId: string }>;
-}) {
+export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+  const { candidateId } = await params;
+  const candidate = previewCandidate(candidateId);
+  return { title: candidate ? `${candidate.full_name} (preview)` : "Candidate (preview)" };
+}
+
+export default async function PreviewCandidateDetailPage({ params }: { params: Params }) {
   const { candidateId } = await params;
   const candidate = previewCandidate(candidateId);
   if (!candidate) notFound();

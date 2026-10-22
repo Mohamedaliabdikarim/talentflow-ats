@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { Sparkles } from "lucide-react";
 import { ConfirmActionDialog } from "@/components/confirm-action-dialog";
 import { Button } from "@/components/ui/button";
@@ -10,27 +11,36 @@ import { CandidateGithubCard } from "@/components/forms/candidate-github-card";
 import { PermissionDenied } from "@/components/permission-denied";
 import { CandidateDetailView } from "@/components/views/candidate-detail";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { isUuid } from "@/lib/validation/id";
 import { removeApplicationAction } from "@/server/actions/applications";
 import { deleteCandidateAction } from "@/server/actions/candidates";
 import { getOrganizationContext } from "@/server/auth";
 import { getCandidate, listCandidateApplications } from "@/server/data/candidates";
 import { listJobOptions } from "@/server/data/jobs";
 
-export const metadata: Metadata = { title: "Candidate" };
+type Params = Promise<{ orgSlug: string; candidateId: string }>;
 
-export default async function CandidateDetailPage({
-  params,
-}: {
-  params: Promise<{ orgSlug: string; candidateId: string }>;
-}) {
+/** One candidate read per request, shared by the page title and the page body. */
+const loadCandidate = cache(getCandidate);
+
+export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+  const { orgSlug, candidateId } = await params;
+  const organization = await getOrganizationContext(orgSlug);
+  const candidate =
+    organization && isUuid(candidateId) ? await loadCandidate(organization.id, candidateId) : null;
+  return { title: candidate?.full_name ?? "Candidate" };
+}
+
+export default async function CandidateDetailPage({ params }: { params: Params }) {
   const { orgSlug, candidateId } = await params;
   const organization = await getOrganizationContext(orgSlug);
   if (!organization) return <PermissionDenied />;
+  if (!isUuid(candidateId)) notFound();
   // The candidate, their applications and the job options are independent, RLS-scoped reads
   // keyed by the route id, so they run in one round trip (ADR-042); a missing candidate still
   // ends in notFound() and the other results are discarded.
   const [candidate, applications, jobs] = await Promise.all([
-    getCandidate(organization.id, candidateId),
+    loadCandidate(organization.id, candidateId),
     listCandidateApplications(organization.id, candidateId),
     listJobOptions(organization.id),
   ]);
